@@ -1,0 +1,65 @@
+{
+  "name": "@syn-con/n8n-nodes-nksc-ivanti",
+  "version": "0.1.0",
+  "description": "n8n node for registering NKSC cyber incident reports in Ivanti",
+  "keywords": [
+    "n8n-community-node-package",
+    "nksc",
+    "ivanti"
+  ],
+  "author": {
+    "name": "UAB Synergy"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.15"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "npx rimraf dist && tsc && gulp build:icons",
+    "dev": "gulp build:icons && tsc --watch",
+    "format": "prettier nodes credentials tests --write",
+    "lint": "eslint nodes credentials index.ts --ext .ts --max-warnings=0",
+    "lint:fix": "eslint nodes credentials index.ts --ext .ts --fix --max-warnings=0",
+    "lint:report": "eslint nodes credentials index.ts --ext .ts --max-warnings=0 --format stylish --output-file eslint-report.txt",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/NkscIvantiApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/NkscIvanti/NkscIvanti.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@eslint/json": "^0.14.0",
+    "@n8n/node-cli": "^0.16.0",
+    "@types/node": "^24.3.1",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "^9.36.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.3",
+    "globals": "^16.4.0",
+    "gulp": "^5.0.0",
+    "n8n-core": "^1.115.0",
+    "n8n-workflow": "^1.82.0",
+    "prettier": "^3.5.3",
+    "rimraf": "^6.1.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.45.0",
+    "vitest": "^2.1.9"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
