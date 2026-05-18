@@ -1,6 +1,6 @@
 {
   "name": "@syn-con/n8n-nodes-nksc-ivanti",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "n8n node for registering NKSC cyber incident reports in Ivanti",
   "keywords": [
     "n8n-community-node-package",
@@ -11,6 +11,13 @@
     "name": "UAB Synergy"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/syn-con/n8n-nodes-nksc-ivanti.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "engines": {
     "node": ">=20.15"
   },
