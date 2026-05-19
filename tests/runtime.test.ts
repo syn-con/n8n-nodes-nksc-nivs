@@ -5,7 +5,10 @@ import { test } from 'vitest';
 import { NkscIvantiApi } from '../credentials/NkscIvantiApi.credentials';
 import { NkscIvanti } from '../nodes/NkscIvanti/NkscIvanti.node';
 import { nkscIvantiOperations } from '../nodes/NkscIvanti/actions/node.type';
-import { reportFieldTypes, reportFormIds } from '../nodes/NkscIvanti/actions/securityReport/reportTypes';
+import {
+	reportFieldTypes,
+	reportFormIds,
+} from '../nodes/NkscIvanti/actions/securityReport/reportTypes';
 
 const require = createRequire(import.meta.url);
 
@@ -52,21 +55,14 @@ test('describes the API credential as a full endpoint-based setup', () => {
 
 test('exposes the runtime constants used by type-only modules', () => {
 	assert.deepEqual([...nkscIvantiOperations], ['insert', 'update', 'search']);
-	assert.deepEqual([...reportFormIds], [
-		'initialWarning',
-		'majorIncident',
-		'minorIncident',
-		'nearMissIncident',
-	]);
-	assert.deepEqual([...reportFieldTypes], [
-		'string',
-		'dateTime',
-		'boolean',
-		'toggle',
-		'yesNo',
-		'multiOptions',
-		'options',
-	]);
+	assert.deepEqual(
+		[...reportFormIds],
+		['initialWarning', 'majorIncident', 'minorIncident', 'nearMissIncident'],
+	);
+	assert.deepEqual(
+		[...reportFieldTypes],
+		['string', 'dateTime', 'boolean', 'toggle', 'yesNo', 'multiOptions', 'options'],
+	);
 });
 
 test('registers the icon build task and points it at node and credential assets', () => {
@@ -113,7 +109,9 @@ test('registers the icon build task and points it at node and credential assets'
 		buildIconsTask?.();
 
 		const srcPatterns = calls.filter(([kind]) => kind === 'src').map(([, pattern]) => pattern);
-		const destPaths = calls.filter(([kind]) => kind === 'dest').map(([, destination]) => destination);
+		const destPaths = calls
+			.filter(([kind]) => kind === 'dest')
+			.map(([, destination]) => destination);
 
 		assert.equal(srcPatterns.length, 2);
 		assert.ok(srcPatterns[0]?.includes('nodes'));

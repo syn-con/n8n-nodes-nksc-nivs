@@ -65,10 +65,9 @@ async function executeItem(
 
 		const records = extractODataRecords(response);
 
-		return this.helpers.constructExecutionMetaData(
-			this.helpers.returnJsonArray(records),
-			{ itemData: { item: itemIndex } },
-		);
+		return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(records), {
+			itemData: { item: itemIndex },
+		});
 	} catch (error) {
 		if (this.continueOnFail()) {
 			return [{ json: { error: (error as Error).message } }];

@@ -1,11 +1,6 @@
 import type { INodeProperties, INodePropertyOptions } from 'n8n-workflow';
 
-import {
-	booleanOptions,
-	noValue,
-	validatedYesNoOptions,
-	yesValue,
-} from './reportFields';
+import { booleanOptions, noValue, validatedYesNoOptions, yesValue } from './reportFields';
 import { reportForms } from './reportFormDefinitions';
 import type { ReportField, ReportFieldType, ReportForm, ReportFormId } from './reportTypes';
 
@@ -80,10 +75,7 @@ const fieldDisplayOrder = [
 	'CyberIncidentReportedValue',
 	'FinalReportUpdateYesNo',
 	'Threat',
-	'ThreatCategoryMalware',
-	'ThreatCategoryIntrusionAttempt',
-	'ThreatCategoryIntrusion',
-	'ThreatCategoryServiceDisruption',
+	'ThreatCategory',
 	'CyberIncidentImpact',
 	'CyberIncidentMitigation',
 	'IntergovernmentalImpactYesNo',
@@ -164,10 +156,14 @@ function createReportFieldProperty(
 		property.options = formField.options ?? [];
 	}
 
+	const typeOptions: NonNullable<INodeProperties['typeOptions']> = {};
+
 	if (formField.type === 'string' && formField.rows !== undefined) {
-		property.typeOptions = {
-			rows: formField.rows,
-		};
+		typeOptions.rows = formField.rows;
+	}
+
+	if (Object.keys(typeOptions).length > 0) {
+		property.typeOptions = typeOptions;
 	}
 
 	return property;

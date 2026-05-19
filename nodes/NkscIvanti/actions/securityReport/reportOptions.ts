@@ -3,8 +3,14 @@ import type { INodePropertyOptions } from 'n8n-workflow';
 export const yesValue = 'Taip';
 export const noValue = 'Ne';
 
-export const booleanOptions = [{ name: 'Yes', value: true }, { name: 'No', value: false }];
-export const validatedYesNoOptions = [{ name: 'Yes', value: yesValue }, { name: 'No', value: noValue }];
+export const booleanOptions = [
+	{ name: 'Yes', value: true },
+	{ name: 'No', value: false },
+];
+export const validatedYesNoOptions = [
+	{ name: 'Yes', value: yesValue },
+	{ name: 'No', value: noValue },
+];
 
 export const scopeOptionFields = [
 	'ScopeOption1',
@@ -23,7 +29,8 @@ export const scopeOptions: INodePropertyOptions[] = [
 	{
 		name: '(Option 1) Services Disrupted Across Lithuania/EU/NATO',
 		value: 'ScopeOption1',
-		description: 'Paslaugos trikdomos visoje Lietuvos teritorijoje ir (ar) bent vienoje ES arba NATO salyje',
+		description:
+			'Paslaugos trikdomos visoje Lietuvos teritorijoje ir (ar) bent vienoje ES arba NATO salyje',
 	},
 	{
 		name: '(Option 2) System Disrupted for 2+ Hours',
@@ -33,7 +40,8 @@ export const scopeOptions: INodePropertyOptions[] = [
 	{
 		name: '(Option 3) 1,000 or 25% Users/Workplaces Affected',
 		value: 'ScopeOption3',
-		description: 'Paveiktu paslaugu gaveju ar darbo vietu skaicius lygus arba didesnis nei 1 000, arba 25 procentai',
+		description:
+			'Paveiktu paslaugu gaveju ar darbo vietu skaicius lygus arba didesnis nei 1 000, arba 25 procentai',
 	},
 	{
 		name: '(Option 4) 1,000 or 25% Recipient Data Affected',
@@ -68,63 +76,211 @@ export const lossOptions: INodePropertyOptions[] = [
 	{ name: '(Option 3) Person Injured or Deceased', value: 'LossOption3' },
 ];
 
-export const threatOptions: INodePropertyOptions[] = [
+type NumberedOption = {
+	number: number;
+	name: string;
+	value: string;
+	description?: string;
+};
+
+const numberOption = (option: NumberedOption): INodePropertyOptions => ({
+	name: `${option.number}. ${option.name}`,
+	value: option.value,
+	...(option.description !== undefined ? { description: option.description } : {}),
+});
+
+const inputToString = (value: unknown): string | undefined => {
+	if (typeof value === 'number' && Number.isFinite(value)) {
+		return String(value);
+	}
+
+	if (typeof value === 'string') {
+		return value.trim();
+	}
+
+	return undefined;
+};
+
+const matchesNumberedOption = (input: string, option: NumberedOption): boolean =>
+	input === option.value ||
+	input === option.name ||
+	input === `${option.number}. ${option.name}` ||
+	input === String(option.number);
+
+const threatOptionDefinitions: NumberedOption[] = [
 	{
+		number: 1,
 		name: 'Distribution of Unwanted, Misleading or Offensive Information',
-		value: 'Nepageidaujamų laiškų, klaidinančios ar žeidžiančios informacijos platinimas',
+		value:
+			'Nepageidaujam\u0173 lai\u0161k\u0173, klaidinan\u010dios ar \u017eeid\u017eian\u010dios informacijos platinimas',
 	},
-	{ name: 'Malware', value: 'Kenkimo programinė įranga' },
-	{ name: 'Information Gathering', value: 'Informacijos rinkimas' },
-	{ name: 'Intrusion Attempt', value: 'Mėginimas įsilaužti' },
-	{ name: 'Intrusion', value: 'Įsilaužimas' },
+	{ number: 2, name: 'Malware', value: 'Kenkimo programin\u0117 \u012franga' },
+	{ number: 3, name: 'Information Gathering', value: 'Informacijos rinkimas' },
+	{ number: 4, name: 'Intrusion Attempt', value: 'M\u0117ginimas \u012fsilau\u017eti' },
+	{ number: 5, name: 'Intrusion', value: '\u012esilau\u017eimas' },
 	{
+		number: 6,
 		name: 'Service Disruption / Availability Violations',
-		value: 'Paslaugų trikdymas, prieinamumo pažeidimai',
+		value: 'Paslaug\u0173 trikdymas, prieinamumo pa\u017eeidimai',
 	},
-	{ name: 'Supply Chain Attacks', value: 'Tiekimo grandinės atakos' },
+	{ number: 7, name: 'Supply Chain Attacks', value: 'Tiekimo grandin\u0117s atakos' },
 	{
+		number: 8,
 		name: 'Information Content Security Violations',
-		value: 'Informacijos turinio saugumo pažeidimai',
+		value: 'Informacijos turinio saugumo pa\u017eeidimai',
 	},
-	{ name: 'Illegal Activity / Fraud', value: 'Neteisėta veikla, sukčiavimas' },
-	{ name: 'Other Threats or Causes', value: 'Kitos grėsmės ar priežastys' },
+	{ number: 9, name: 'Illegal Activity / Fraud', value: 'Neteis\u0117ta veikla, suk\u010diavimas' },
+	{
+		number: 10,
+		name: 'Other Threats or Causes',
+		value: 'Kitos gr\u0117sm\u0117s ar prie\u017eastys',
+	},
 ];
+
+export const threatOptions: INodePropertyOptions[] = threatOptionDefinitions.map(numberOption);
 
 export const threatCategoryGroups = [
 	{
-		fieldName: 'ThreatCategoryMalware',
-		threat: 'Kenkimo programinė įranga',
+		name: 'Malware',
+		threat: 'Kenkimo programin\u0117 \u012franga',
 		options: [
-			'Pažangi kenkimo programinė įranga',
-			'Duomenis šifruojantis ar naikinantis kodas',
-			'Informacinės sistemos dalys, aktyviai kontroliuojamos įsibrovėlių',
-			'Kenkimo programinės įrangos platinimas',
+			{
+				name: 'Advanced Malware',
+				value: 'Pa\u017eangi kenkimo programin\u0117 \u012franga',
+			},
+			{
+				name: 'Data-Encrypting or Data-Destructive Code',
+				value: 'Duomenis \u0161ifruojantis ar naikinantis kodas',
+			},
+			{
+				name: 'Information System Components Actively Controlled by Intruders',
+				value:
+					'Informacin\u0117s sistemos dalys, aktyviai kontroliuojamos \u012fsibrov\u0117li\u0173',
+			},
+			{
+				name: 'Malware Distribution',
+				value: 'Kenkimo programin\u0117s \u012frangos platinimas',
+			},
 		],
 	},
 	{
-		fieldName: 'ThreatCategoryIntrusionAttempt',
-		threat: 'Mėginimas įsilaužti',
+		name: 'Intrusion Attempt',
+		threat: 'M\u0117ginimas \u012fsilau\u017eti',
 		options: [
-			'Išnaudojama viena ar kelios nežinomos spragos',
-			'Tinklų ir informacinės sistemos žvalgyba',
-			'Išnaudojamos žinomos ir viešai publikuotos spragos',
-			'Mėginimas įsilaužti',
+			{
+				name: 'One or More Unknown Vulnerabilities Exploited',
+				value: 'I\u0161naudojama viena ar kelios ne\u017einomos spragos',
+			},
+			{
+				name: 'Network and Information System Reconnaissance',
+				value: 'Tinkl\u0173 ir informacin\u0117s sistemos \u017evalgyba',
+			},
+			{
+				name: 'Known and Publicly Disclosed Vulnerabilities Exploited',
+				value: 'I\u0161naudojamos \u017einomos ir vie\u0161ai publikuotos spragos',
+			},
+			{
+				name: 'Intrusion Attempt',
+				value: 'M\u0117ginimas \u012fsilau\u017eti',
+			},
 		],
 	},
 	{
-		fieldName: 'ThreatCategoryIntrusion',
-		threat: 'Įsilaužimas',
+		name: 'Intrusion',
+		threat: '\u012esilau\u017eimas',
 		options: [
-			'Veiksmai prieš tinklų ir informacinę sistemą ar jos saugumo priemones',
-			'Gaunama neteisėta prieiga',
+			{
+				name: 'Actions Against a Network and Information System or Its Security Measures',
+				value:
+					'Veiksmai prie\u0161 tinkl\u0173 ir informacin\u0119 sistem\u0105 ar jos saugumo priemones',
+			},
+			{
+				name: 'Unauthorized Access Obtained',
+				value: 'Gaunama neteis\u0117ta prieiga',
+			},
 		],
 	},
 	{
-		fieldName: 'ThreatCategoryServiceDisruption',
-		threat: 'Paslaugų trikdymas, prieinamumo pažeidimai',
+		name: 'Service Disruption / Availability Violations',
+		threat: 'Paslaug\u0173 trikdymas, prieinamumo pa\u017eeidimai',
 		options: [
-			'Teikiamų paslaugų nutraukimas',
-			'Teikiamų paslaugų nepertraukiamo teikimo trikdymas',
+			{
+				name: 'Service Interruption',
+				value: 'Teikiam\u0173 paslaug\u0173 nutraukimas',
+			},
+			{
+				name: 'Continuous Service Delivery Disruption',
+				value: 'Teikiam\u0173 paslaug\u0173 nepertraukiamo teikimo trikdymas',
+			},
 		],
 	},
 ] as const;
+
+function getThreatCategoryOptionDefinitions(): NumberedOption[] {
+	let nextNumber = 1;
+	const categoryOptions: NumberedOption[] = [
+		{
+			number: 0,
+			name: 'None',
+			value: '',
+			description: 'No Threat Category',
+		},
+	];
+
+	for (const group of threatCategoryGroups) {
+		for (const option of group.options) {
+			categoryOptions.push({
+				number: nextNumber,
+				name: `${group.name} - ${option.name}`,
+				value: option.value,
+				description: group.name,
+			});
+			nextNumber += 1;
+		}
+	}
+
+	return categoryOptions;
+}
+
+export function getThreatCategoryOptions(): INodePropertyOptions[] {
+	return getThreatCategoryOptionDefinitions().map(numberOption);
+}
+
+export function normalizeThreatValue(threat: unknown): string | undefined {
+	const input = inputToString(threat);
+	if (input === undefined) {
+		return undefined;
+	}
+
+	return threatOptionDefinitions.find((option) => matchesNumberedOption(input, option))?.value;
+}
+
+export function normalizeThreatCategoryValue(category: unknown): string | undefined {
+	const input = inputToString(category);
+	if (input === undefined) {
+		return undefined;
+	}
+
+	const categoryOptions = getThreatCategoryOptionDefinitions();
+	const exactMatch = categoryOptions.find((option) => matchesNumberedOption(input, option));
+	if (exactMatch) {
+		return exactMatch.value;
+	}
+
+	const bareNameMatches = threatCategoryGroups.flatMap((group) =>
+		group.options.filter((option) => option.name === input),
+	);
+	if (bareNameMatches.length === 1) {
+		return bareNameMatches[0]?.value;
+	}
+
+	return undefined;
+}
+
+export function isThreatCategoryForThreat(threat: string, category: string): boolean {
+	const normalizedThreat = normalizeThreatValue(threat) ?? threat;
+	const normalizedCategory = normalizeThreatCategoryValue(category) ?? category;
+	const group = threatCategoryGroups.find((candidate) => candidate.threat === normalizedThreat);
+
+	return group?.options.some((option) => option.value === normalizedCategory) ?? false;
+}

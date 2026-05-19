@@ -16,9 +16,7 @@ import {
 } from './reportForms';
 import { buildReportPayload, type PayloadInput, type PayloadValue } from './payload';
 
-export const properties: INodeProperties[] = [
-	...getReportFieldProperties(),
-];
+export const properties: INodeProperties[] = [...getReportFieldProperties()];
 
 const displayOptions = {
 	show: {
@@ -54,10 +52,9 @@ async function executeItem(
 		});
 		const responseData = sanitizeResponse(response);
 
-		return this.helpers.constructExecutionMetaData(
-			this.helpers.returnJsonArray(responseData),
-			{ itemData: { item: itemIndex } },
-		);
+		return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(responseData), {
+			itemData: { item: itemIndex },
+		});
 	} catch (error) {
 		if (this.continueOnFail()) {
 			return [{ json: { error: (error as Error).message } }];
@@ -112,10 +109,7 @@ export function getSelectedReportForm(this: IExecuteFunctions, itemIndex: number
 	const reportForm = this.getNodeParameter('reportForm', itemIndex) as string;
 
 	if (formVersion !== defaultFormVersion) {
-		throw new NodeOperationError(
-			this.getNode(),
-			`Unsupported NKSC form version: ${formVersion}`,
-		);
+		throw new NodeOperationError(this.getNode(), `Unsupported NKSC form version: ${formVersion}`);
 	}
 
 	try {

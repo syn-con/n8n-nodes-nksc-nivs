@@ -34,10 +34,7 @@ test('normalizes explicit API endpoint URLs', () => {
 });
 
 test('preserves explicit HTTP API endpoints', () => {
-	assert.equal(
-		buildApiBaseUrl('http://uat1-putheat/HEAT/api/'),
-		'http://uat1-putheat/HEAT/api',
-	);
+	assert.equal(buildApiBaseUrl('http://uat1-putheat/HEAT/api/'), 'http://uat1-putheat/HEAT/api');
 });
 
 test('adds HTTPS to bare endpoint hosts', () => {
@@ -82,7 +79,10 @@ test('returns response bodies and forwards query parameters', async () => {
 	});
 
 	assert.deepEqual(result, { value: [{ RecId: 'A' }] });
-	assert.equal(httpRequest.mock.calls[0][0].url, 'https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports');
+	assert.equal(
+		httpRequest.mock.calls[0][0].url,
+		'https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports',
+	);
 	assert.deepEqual(httpRequest.mock.calls[0][0].qs, {
 		$filter: "XSC_ExternalTicket_RecId eq 'EXT-123'",
 	});
@@ -125,13 +125,12 @@ test('rejects non-2xx responses', async () => {
 		},
 	});
 
-	await assert.rejects(
-		() =>
-			nkscIvantiApiRequest.call(context, {
-				method: 'PATCH',
-				endpoint: '/odata/businessobject/XSC_SecurityReport__DetailReports(\'RID-1\')',
-				body: { Summary: 'Updated' },
-			}),
+	await assert.rejects(() =>
+		nkscIvantiApiRequest.call(context, {
+			method: 'PATCH',
+			endpoint: "/odata/businessobject/XSC_SecurityReport__DetailReports('RID-1')",
+			body: { Summary: 'Updated' },
+		}),
 	);
 });
 
@@ -144,11 +143,10 @@ test('wraps unexpected HTTP errors in a node api error', async () => {
 		error: new Error('network down'),
 	});
 
-	await assert.rejects(
-		() =>
-			nkscIvantiApiRequest.call(context, {
-				method: 'GET',
-				endpoint: '/odata/businessobject/XSC_SecurityReport__DetailReports',
-			}),
+	await assert.rejects(() =>
+		nkscIvantiApiRequest.call(context, {
+			method: 'GET',
+			endpoint: '/odata/businessobject/XSC_SecurityReport__DetailReports',
+		}),
 	);
 });

@@ -9,6 +9,10 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			reports: ['text', 'lcov'],
+			thresholds: {
+				branches: 80,
+				perFile: true,
+			},
 			exclude: [
 				'dist/**',
 				'node_modules/**',

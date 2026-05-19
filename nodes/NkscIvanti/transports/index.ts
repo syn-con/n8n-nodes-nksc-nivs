@@ -17,11 +17,11 @@ type NkscIvantiApiRequestContext =
 	| ILoadOptionsFunctions;
 
 type NkscIvantiApiRequestOptions = {
-	method: IHttpRequestMethods,
-	endpoint: string,
-	body?: IDataObject,
-	qs?: IDataObject,
-	headers?: IDataObject,
+	method: IHttpRequestMethods;
+	endpoint: string;
+	body?: IDataObject;
+	qs?: IDataObject;
+	headers?: IDataObject;
 };
 
 export async function nkscIvantiApiRequest(
@@ -34,9 +34,7 @@ export async function nkscIvantiApiRequest(
 		throw new Error('No NKSC Ivanti credentials got returned');
 	}
 
-	const baseUrl = buildApiBaseUrl(
-		credential.tenant as string,
-	);
+	const baseUrl = buildApiBaseUrl(credential.tenant as string);
 
 	const options: IHttpRequestOptions = {
 		headers: {

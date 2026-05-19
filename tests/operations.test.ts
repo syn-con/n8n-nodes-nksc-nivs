@@ -7,7 +7,10 @@ import * as searchOperation from '../nodes/NkscIvanti/actions/securityReport/sea
 import * as updateOperation from '../nodes/NkscIvanti/actions/securityReport/update.operation';
 import { reportForms } from '../nodes/NkscIvanti/actions/securityReport/reportForms';
 
-function createExecuteContext(parameters: Record<string, unknown>, options?: { continueOnFail?: boolean }) {
+function createExecuteContext(
+	parameters: Record<string, unknown>,
+	options?: { continueOnFail?: boolean },
+) {
 	const httpRequest = vi.fn();
 	const getCredentials = vi.fn().mockResolvedValue({
 		tenant: 'https://ivanti.example.local/HEAT/api',
@@ -28,6 +31,7 @@ function createExecuteContext(parameters: Record<string, unknown>, options?: { c
 			throw new Error(`${name} is missing`);
 		},
 		getCredentials,
+		getTimezone: () => 'UTC',
 		getNode: () => ({ name: 'NKSC Ivanti' }),
 		continueOnFail: () => options?.continueOnFail ?? false,
 		helpers: {
@@ -95,6 +99,77 @@ test('insert execution returns an error item when continue on fail is enabled', 
 	assert.equal(result[0]?.json?.error, 'Unsupported NKSC form version: v2');
 });
 
+test('insert execution throws wrapped node errors when continue on fail is disabled', async () => {
+	const context = createExecuteContext({
+		formVersion: 'v2',
+		reportForm: 'initialWarning',
+	});
+
+	await assert.rejects(
+		() => insertOperation.execute.call(context),
+		/Unsupported NKSC form version: v2/,
+	);
+});
+
+test('insert payload input uses field fallback values when n8n parameters are missing', () => {
+	const form = {
+		...reportForms.initialWarning,
+		fields: [
+			{
+				displayName: 'Fallback Multi',
+				name: 'FallbackMulti',
+				type: 'multiOptions',
+				description: 'Coverage-only multi-select field',
+			},
+			{
+				displayName: 'Fallback String',
+				name: 'FallbackString',
+				type: 'string',
+				description: 'Coverage-only text field',
+			},
+			{
+				displayName: 'Fallback Default',
+				name: 'FallbackDefault',
+				type: 'string',
+				default: 'default value',
+				description: 'Coverage-only defaulted field',
+			},
+		],
+	} as typeof reportForms.initialWarning;
+	const context = {
+		getNodeParameter() {
+			throw new Error('parameter missing');
+		},
+	};
+
+	const input = insertOperation.getPayloadInput.call(context as any, 0, form);
+
+	assert.deepEqual(input, {
+		FallbackMulti: [],
+		FallbackString: '',
+		FallbackDefault: 'default value',
+	});
+});
+
+test('insert report form selection wraps unsupported form errors', () => {
+	const context = createExecuteContext({
+		formVersion: 'v1',
+		reportForm: 'unsupportedForm',
+	});
+
+	assert.throws(
+		() => insertOperation.getSelectedReportForm.call(context, 0),
+		/Unsupported NKSC report form: unsupportedForm/,
+	);
+});
+
+test('insert response sanitizer leaves responses without OData context unchanged', () => {
+	const response = { RecId: 'record-1' };
+
+	assert.equal(insertOperation.sanitizeResponse(response), response);
+	assert.deepEqual(response, { RecId: 'record-1' });
+});
+
 test('update execution patches the selected record', async () => {
 	const context = createExecuteContext({
 		formVersion: 'v1',
@@ -131,7 +206,7 @@ test('update execution patches the selected record', async () => {
 	assert.equal(httpRequest.mock.calls[0][0].method, 'PATCH');
 	assert.equal(
 		httpRequest.mock.calls[0][0].url,
-		'https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports(\'RID-123\')',
+		"https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports('RID-123')",
 	);
 });
 
@@ -192,9 +267,15 @@ test('search execution returns an error item when the external ticket ID is empt
 });
 
 test('router dispatches operations and rejects unsupported ones', async () => {
-	const insertSpy = vi.spyOn(insertOperation, 'execute').mockResolvedValue([{ json: { operation: 'insert' } }]);
-	const updateSpy = vi.spyOn(updateOperation, 'execute').mockResolvedValue([{ json: { operation: 'update' } }]);
-	const searchSpy = vi.spyOn(searchOperation, 'execute').mockResolvedValue([{ json: { operation: 'search' } }]);
+	const insertSpy = vi
+		.spyOn(insertOperation, 'execute')
+		.mockResolvedValue([{ json: { operation: 'insert' } }]);
+	const updateSpy = vi
+		.spyOn(updateOperation, 'execute')
+		.mockResolvedValue([{ json: { operation: 'update' } }]);
+	const searchSpy = vi
+		.spyOn(searchOperation, 'execute')
+		.mockResolvedValue([{ json: { operation: 'search' } }]);
 
 	try {
 		const insertResult = await router.call({

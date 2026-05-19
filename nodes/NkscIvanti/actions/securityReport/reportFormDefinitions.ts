@@ -11,7 +11,7 @@ import {
 	scopeOptionToggleFields,
 	scopeOptionsExpandedField,
 	scopeOptions,
-	threatCategoryFields,
+	threatCategoryField,
 	threatCategoryGroups,
 	threatOptions,
 	yesValue,
@@ -46,8 +46,16 @@ const initialWarning: ReportForm = {
 		baseFields.otherInformation,
 	],
 	conditionalRequired: [
-		{ when: 'IntergovernmentalImpactYesNo', is: yesValue, require: ['IntergovernmentalImpactValue'] },
-		{ when: 'CyberIncidentResolvedHelpYesNo', is: yesValue, require: ['CyberIncidentResolvedHelpValue'] },
+		{
+			when: 'IntergovernmentalImpactYesNo',
+			is: yesValue,
+			require: ['IntergovernmentalImpactValue'],
+		},
+		{
+			when: 'CyberIncidentResolvedHelpYesNo',
+			is: yesValue,
+			require: ['CyberIncidentResolvedHelpValue'],
+		},
 		{ when: 'CyberIncidentReportedYesNo', is: yesValue, require: ['CyberIncidentReportedValue'] },
 	],
 };
@@ -74,7 +82,8 @@ const majorIncident: ReportForm = {
 			default: [],
 			required: true,
 			visibleWhen: { ScopeOptionsExpanded: [false] },
-			description: 'Select every condition that fits the incident. At least one selection is required.',
+			description:
+				'Select every condition that fits the incident. At least one selection is required.',
 			options: scopeOptions,
 			optionFields: scopeOptionFields,
 		}),
@@ -143,7 +152,11 @@ const majorIncident: ReportForm = {
 		message: 'At least one Scope Option must be selected',
 	},
 	conditionalRequired: [
-		{ when: 'CyberIncidentReputationYesNo', is: yesValue, require: ['CyberIncidentReputationValue'] },
+		{
+			when: 'CyberIncidentReputationYesNo',
+			is: yesValue,
+			require: ['CyberIncidentReputationValue'],
+		},
 		{
 			when: 'ImpactToPersonYesNo',
 			is: yesValue,
@@ -205,7 +218,7 @@ const minorIncident: ReportForm = {
 			description: 'Kibernetine gresme',
 			options: threatOptions,
 		}),
-		...threatCategoryFields,
+		threatCategoryField,
 		field({
 			displayName: 'Cyber Incident Impact',
 			name: 'CyberIncidentImpact',
@@ -232,7 +245,11 @@ const minorIncident: ReportForm = {
 		{ when: 'CyberIncidentResolvedYesNo', is: noValue, require: ['CyberIncidentResolvedValue'] },
 		{ when: 'FinancialLossYesNo', is: yesValue, require: ['FinancialLossValue'] },
 		{ when: 'ImpactFromThirdPartyYesNo', is: yesValue, require: ['ImpactFromThirdPartyValue'] },
-		{ when: 'CyberIncidentResolvedHelpYesNo', is: yesValue, require: ['CyberIncidentResolvedHelpValue'] },
+		{
+			when: 'CyberIncidentResolvedHelpYesNo',
+			is: yesValue,
+			require: ['CyberIncidentResolvedHelpValue'],
+		},
 		{ when: 'CyberIncidentReportedYesNo', is: yesValue, require: ['CyberIncidentReportedValue'] },
 		{
 			when: 'FinalReportUpdateYesNo',
@@ -244,7 +261,11 @@ const minorIncident: ReportForm = {
 			is: group.threat,
 			require: ['ThreatCategory'],
 		})),
-		{ when: 'IntergovernmentalImpactYesNo', is: yesValue, require: ['IntergovernmentalImpactValue'] },
+		{
+			when: 'IntergovernmentalImpactYesNo',
+			is: yesValue,
+			require: ['IntergovernmentalImpactValue'],
+		},
 	],
 };
 

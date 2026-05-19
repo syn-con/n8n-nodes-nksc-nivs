@@ -1,7 +1,7 @@
 import type { INodePropertyOptions } from 'n8n-workflow';
 
 import type { ReportField } from './reportTypes';
-import { lossOptions, noValue, scopeOptions, threatCategoryGroups } from './reportOptions';
+import { getThreatCategoryOptions, lossOptions, noValue, scopeOptions } from './reportOptions';
 
 export {
 	booleanOptions,
@@ -18,20 +18,15 @@ export {
 
 export const field = (definition: ReportField): ReportField => definition;
 
-export const threatCategoryFields: ReportField[] = threatCategoryGroups.map((group) =>
-	field({
-		displayName: 'Threat Category',
-		name: group.fieldName,
-		payloadName: 'ThreatCategory',
-		type: 'options',
-		default: '',
-		maxLength: 1000,
-		description: `Kibernetines gresmes pogrupis: ${group.threat}`,
-		options: group.options.map((option) => ({ name: option, value: option })),
-		visibleWhen: { Threat: [group.threat] },
-		alwaysVisible: true,
-	}),
-);
+export const threatCategoryField = field({
+	displayName: 'Threat Category',
+	name: 'ThreatCategory',
+	type: 'options',
+	default: '',
+	maxLength: 1000,
+	description: 'Kibernetines gresmes pogrupis',
+	options: getThreatCategoryOptions(),
+});
 
 function createExpandedOptionFields(
 	options: readonly INodePropertyOptions[],
@@ -58,7 +53,10 @@ export const scopeOptionsExpandedField = field({
 	omitFromPayload: true,
 });
 
-export const scopeOptionToggleFields = createExpandedOptionFields(scopeOptions, 'ScopeOptionsExpanded');
+export const scopeOptionToggleFields = createExpandedOptionFields(
+	scopeOptions,
+	'ScopeOptionsExpanded',
+);
 
 export const lossOptionsExpandedField = field({
 	displayName: 'Expand Loss Options',
@@ -69,7 +67,10 @@ export const lossOptionsExpandedField = field({
 	omitFromPayload: true,
 });
 
-export const lossOptionToggleFields = createExpandedOptionFields(lossOptions, 'LossOptionsExpanded');
+export const lossOptionToggleFields = createExpandedOptionFields(
+	lossOptions,
+	'LossOptionsExpanded',
+);
 
 export const baseFields = {
 	organization: field({

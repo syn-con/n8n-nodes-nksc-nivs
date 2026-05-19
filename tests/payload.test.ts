@@ -4,12 +4,20 @@ import type { INodePropertyOptions } from 'n8n-workflow';
 
 import {
 	defaultFormVersion,
+	getReportForm,
 	getReportFieldProperties,
 	noValue,
 	reportForms,
 	reportFormOptions,
 	yesValue,
 } from '../nodes/NkscIvanti/actions/securityReport/reportForms';
+import {
+	getThreatCategoryOptions,
+	isThreatCategoryForThreat,
+	normalizeThreatCategoryValue,
+	normalizeThreatValue,
+	threatCategoryGroups,
+} from '../nodes/NkscIvanti/actions/securityReport/reportOptions';
 import {
 	description as insertDescription,
 	getPayloadInput,
@@ -54,13 +62,14 @@ const validInitialReporter = {
 const minorIncidentThreatField = reportForms.minorIncident.fields.find(
 	(field) => field.name === 'Threat',
 );
-const malwareThreatValue = minorIncidentThreatField?.options?.find(
-	(option) => option.name === 'Malware',
-)?.value as string;
-const malwareCategoryField = reportForms.minorIncident.fields.find(
-	(field) => field.name === 'ThreatCategoryMalware',
+const malwareThreatOption = minorIncidentThreatField?.options?.find(
+	(option) => option.name === '2. Malware',
 );
-const malwareCategoryValue = malwareCategoryField?.options?.[0]?.value as string;
+const malwareThreatValue = malwareThreatOption?.value as string;
+const malwareCategoryOption = getThreatCategoryOptions().find(
+	(option) => option.name === '1. Malware - Advanced Malware',
+);
+const malwareCategoryValue = malwareCategoryOption?.value as string;
 const nearMissIncidentType = reportForms.nearMissIncident.fixedFields.TypeOfCyberIncident as string;
 
 const backendRequiredReporterFields = [
@@ -82,18 +91,68 @@ test('exposes all NKSC report forms', () => {
 	);
 });
 
+test('rejects unsupported report forms', () => {
+	assert.throws(() => getReportForm('unsupportedForm'), /Unsupported NKSC report form/);
+});
+
 test('builds a major incident payload with fixed incident type', () => {
 	const payload = buildReportPayload(reportForms.majorIncident, validMajorIncident, true);
 
 	assert.equal(payload.TypeOfCyberIncident, 'Didelis');
 	assert.equal(payload.Summary, 'Didelis incidentas');
-	assert.equal(payload.DetectedOn, '2026-04-29T14:30:12');
+	assert.equal(payload.DetectedOn, '2026-04-29T11:30:12');
 	assert.equal(payload.ScopeOption2, true);
 	assert.equal(payload.ScopeOption1, false);
 	assert.equal(payload.ScopeOptions, undefined);
 	assert.equal(payload.InitialReportUpdateYesNo, noValue);
 	assert.equal(payload.CyberIncidentResolvedYesNo, yesValue);
 	assert.equal(payload.XSC_ExternalTicket_RecId, 'EXT-123');
+});
+
+test('subtracts the fixed n8n date picker offset before sending date/time fields', () => {
+	const payload = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: '2026-05-05 03:00:00',
+		},
+		true,
+	);
+
+	assert.equal(payload.DetectedOn, '2026-05-05T00:00:00');
+});
+
+test('rejects future date/time field values', () => {
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.majorIncident,
+				{
+					...validMajorIncident,
+					DetectedOn: '2026-05-19T15:00:01Z',
+				},
+				true,
+				{
+					now: new Date('2026-05-19T12:00:00Z'),
+				},
+			),
+		/Detected On cannot be in the future/,
+	);
+});
+
+test('rejects invalid exact date/time field values', () => {
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.majorIncident,
+				{
+					...validMajorIncident,
+					DetectedOn: '2026-02-30 00:00:00',
+				},
+				true,
+			),
+		/Detected On must be a valid date\/time/,
+	);
 });
 
 test('omits external ticket ID when it is empty', () => {
@@ -127,6 +186,99 @@ test('does not expose Not Set in boolean field options', () => {
 	}
 });
 
+test('generates fallback n8n properties for field types without explicit defaults', () => {
+	const originalFields = reportForms.initialWarning.fields;
+	const fallbackFields = [
+		{
+			displayName: 'Fallback Multi',
+			name: 'FallbackMulti',
+			type: 'multiOptions',
+			description: 'Coverage-only multi-select field',
+		},
+		{
+			displayName: 'Fallback Yes No',
+			name: 'FallbackYesNo',
+			type: 'yesNo',
+			description: 'Coverage-only Taip/Ne field',
+		},
+		{
+			displayName: 'Fallback Boolean',
+			name: 'FallbackBoolean',
+			type: 'boolean',
+			description: 'Coverage-only true/false field',
+		},
+		{
+			displayName: 'Fallback Toggle',
+			name: 'FallbackToggle',
+			type: 'toggle',
+			description: 'Coverage-only UI toggle field',
+		},
+		{
+			displayName: 'Fallback Options',
+			name: 'FallbackOptions',
+			type: 'options',
+			description: 'Coverage-only options field',
+		},
+		{
+			displayName: 'Fallback Date',
+			name: 'FallbackDate',
+			type: 'dateTime',
+			description: 'Coverage-only date field',
+		},
+		{
+			displayName: 'Always Visible Field',
+			name: 'AlwaysVisibleField',
+			type: 'string',
+			description: 'Coverage-only field with ignored conditional visibility',
+			visibleWhen: { FallbackToggle: [true] },
+			alwaysVisible: true,
+		},
+	] satisfies typeof reportForms.initialWarning.fields;
+
+	try {
+		reportForms.initialWarning.fields = [...originalFields, ...fallbackFields];
+		const properties = getReportFieldProperties();
+		const propertyByName = new Map(properties.map((property) => [property.name, property]));
+
+		assert.deepEqual(propertyByName.get('FallbackMulti')?.default, []);
+		assert.deepEqual(propertyByName.get('FallbackMulti')?.options, []);
+		assert.equal(propertyByName.get('FallbackYesNo')?.default, noValue);
+		assert.deepEqual(
+			(propertyByName.get('FallbackYesNo')?.options as INodePropertyOptions[] | undefined)?.map(
+				(option) => option.value,
+			),
+			[yesValue, noValue],
+		);
+		assert.equal(propertyByName.get('FallbackBoolean')?.default, false);
+		assert.deepEqual(
+			(propertyByName.get('FallbackBoolean')?.options as INodePropertyOptions[] | undefined)?.map(
+				(option) => option.value,
+			),
+			[true, false],
+		);
+		assert.equal(propertyByName.get('FallbackToggle')?.type, 'boolean');
+		assert.equal(propertyByName.get('FallbackToggle')?.default, false);
+		assert.deepEqual(propertyByName.get('FallbackOptions')?.options, []);
+		assert.equal(propertyByName.get('FallbackDate')?.default, '');
+		assert.deepEqual(propertyByName.get('AlwaysVisibleField')?.displayOptions?.show, {
+			reportForm: ['initialWarning'],
+		});
+	} finally {
+		reportForms.initialWarning.fields = originalFields;
+	}
+});
+
+test('uses numbered English labels and Lithuanian values for threat options', () => {
+	const threatProperty = getReportFieldProperties().find((property) => property.name === 'Threat');
+	const malwareOption = (threatProperty?.options as INodePropertyOptions[] | undefined)?.find(
+		(option) => option.name === '2. Malware',
+	);
+
+	assert.equal(malwareOption?.name, '2. Malware');
+	assert.equal(malwareOption?.value, malwareThreatValue);
+	assert.notEqual(malwareOption?.name, malwareOption?.value);
+});
+
 test('marks required-by-default report fields as required in the n8n UI', () => {
 	const fieldProperties = getReportFieldProperties();
 
@@ -156,11 +308,7 @@ test('marks required-by-default report fields as required in the n8n UI', () => 
 
 test('matches audited required-by-default fields from NKSC HTML forms', () => {
 	const htmlRequiredFieldsByForm = {
-		initialWarning: [
-			'Summary',
-			'CriminalOffenceYesNo',
-			'CyberIncidentResolvedHelpYesNo',
-		],
+		initialWarning: ['Summary', 'CriminalOffenceYesNo', 'CyberIncidentResolvedHelpYesNo'],
 		majorIncident: [
 			'Summary',
 			'ScopeOptions',
@@ -194,10 +342,7 @@ test('matches audited required-by-default fields from NKSC HTML forms', () => {
 			.filter((field) => field.required === true)
 			.map((field) => field.name);
 
-		assert.deepEqual(requiredFieldNames, [
-			...backendRequiredReporterFields,
-			...htmlRequiredFields,
-		]);
+		assert.deepEqual(requiredFieldNames, [...backendRequiredReporterFields, ...htmlRequiredFields]);
 	}
 });
 
@@ -255,7 +400,9 @@ test('keeps field visibility scoped to the selected report form after operation 
 	const detailReportProperty = insertDescription.find(
 		(property) => property.name === 'DetailReportDescription',
 	);
-	const scopeOptionsProperty = insertDescription.find((property) => property.name === 'ScopeOptions');
+	const scopeOptionsProperty = insertDescription.find(
+		(property) => property.name === 'ScopeOptions',
+	);
 	const externalTicketProperty = insertDescription.find(
 		(property) => property.name === externalTicketIdField,
 	);
@@ -308,10 +455,7 @@ test('shows operation before report selection', () => {
 });
 
 test('builds external ticket search filter with OData escaping', () => {
-	assert.equal(
-		buildExternalTicketFilter(" EXT-'123 "),
-		"XSC_ExternalTicket_RecId eq 'EXT-''123'",
-	);
+	assert.equal(buildExternalTicketFilter(" EXT-'123 "), "XSC_ExternalTicket_RecId eq 'EXT-''123'");
 });
 
 test('extracts all matching records from OData search responses', () => {
@@ -395,19 +539,49 @@ test('continues collecting payload input when n8n parameter reads throw for miss
 });
 
 test('requires conditional fields when toggles are selected', () => {
-	assert.throws(() =>
-		buildReportPayload(
-			reportForms.majorIncident,
-			{
-				...validMajorIncident,
-				ImpactToPersonYesNo: yesValue,
-			},
-			true,
-		),
-	(error) =>
-		error instanceof Error &&
-		error.message.includes('At least one Loss Option must be selected') &&
-		error.message.includes('Affected Persons is required'),
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.majorIncident,
+				{
+					...validMajorIncident,
+					ImpactToPersonYesNo: yesValue,
+				},
+				true,
+			),
+		(error) =>
+			error instanceof Error &&
+			error.message.includes('At least one Loss Option must be selected') &&
+			error.message.includes('Affected Persons is required'),
+	);
+});
+
+test('recursively reports conditional fields behind missing conditional inputs', () => {
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.minorIncident,
+				{
+					...validInitialReporter,
+					Summary: 'Nedidelis incidentas',
+					ImpactToPersonYesNo: noValue,
+					CyberIncidentResolvedYesNo: yesValue,
+					CriminalOffenceYesNo: noValue,
+					AffectedServices: 'Paslaugos',
+					FinancialLossYesNo: noValue,
+					ImpactFromThirdPartyYesNo: noValue,
+					CyberIncidentResolvedHelpYesNo: noValue,
+					CyberIncidentReportedYesNo: noValue,
+					FinalReportUpdateYesNo: noValue,
+				},
+				true,
+			),
+		(error) =>
+			error instanceof Error &&
+			error.message.includes('Threat is required') &&
+			error.message.includes('Threat Category is required') &&
+			error.message.includes('Cyber Incident Impact is required') &&
+			error.message.includes('Cyber Incident Mitigation is required'),
 	);
 });
 
@@ -470,7 +644,7 @@ test('builds minor incident payload with fixed incident type', () => {
 			CyberIncidentReportedYesNo: noValue,
 			FinalReportUpdateYesNo: yesValue,
 			Threat: malwareThreatValue,
-			ThreatCategoryMalware: malwareCategoryValue,
+			ThreatCategory: malwareCategoryValue,
 		},
 		true,
 	);
@@ -478,6 +652,98 @@ test('builds minor incident payload with fixed incident type', () => {
 	assert.equal(payload.TypeOfCyberIncident, 'Nedidelis');
 	assert.equal(payload.Threat, malwareThreatValue);
 	assert.equal(payload.ThreatCategory, malwareCategoryValue);
+});
+
+test('normalizes English threat and category aliases from expressions', () => {
+	const payload = buildReportPayload(
+		reportForms.minorIncident,
+		{
+			...validInitialReporter,
+			Summary: 'Nedidelis incidentas',
+			ImpactToPersonYesNo: noValue,
+			CyberIncidentResolvedYesNo: yesValue,
+			CriminalOffenceYesNo: noValue,
+			AffectedServices: 'Paslaugos',
+			FinancialLossYesNo: noValue,
+			ImpactFromThirdPartyYesNo: noValue,
+			CyberIncidentResolvedHelpYesNo: noValue,
+			CyberIncidentReportedYesNo: noValue,
+			FinalReportUpdateYesNo: yesValue,
+			Threat: 'Malware',
+			ThreatCategory: 'Malware - Advanced Malware',
+		},
+		true,
+	);
+
+	assert.equal(payload.Threat, malwareThreatValue);
+	assert.equal(payload.ThreatCategory, malwareCategoryValue);
+});
+
+test('normalizes numeric threat and category aliases from expressions', () => {
+	const payload = buildReportPayload(
+		reportForms.minorIncident,
+		{
+			...validInitialReporter,
+			Summary: 'Nedidelis incidentas',
+			ImpactToPersonYesNo: noValue,
+			CyberIncidentResolvedYesNo: yesValue,
+			CriminalOffenceYesNo: noValue,
+			AffectedServices: 'Paslaugos',
+			FinancialLossYesNo: noValue,
+			ImpactFromThirdPartyYesNo: noValue,
+			CyberIncidentResolvedHelpYesNo: noValue,
+			CyberIncidentReportedYesNo: noValue,
+			FinalReportUpdateYesNo: yesValue,
+			Threat: 2,
+			ThreatCategory: 1,
+		},
+		true,
+	);
+
+	assert.equal(payload.Threat, malwareThreatValue);
+	assert.equal(payload.ThreatCategory, malwareCategoryValue);
+});
+
+test('normalizes threat and category expression inputs defensively', () => {
+	assert.equal(normalizeThreatValue(` 2. Malware `), malwareThreatValue);
+	assert.equal(normalizeThreatValue(malwareThreatValue), malwareThreatValue);
+	assert.equal(normalizeThreatValue(Number.POSITIVE_INFINITY), undefined);
+	assert.equal(normalizeThreatValue({}), undefined);
+	assert.equal(normalizeThreatValue('Unknown Threat'), undefined);
+
+	assert.equal(normalizeThreatCategoryValue('Advanced Malware'), malwareCategoryValue);
+	assert.equal(normalizeThreatCategoryValue(malwareCategoryValue), malwareCategoryValue);
+	assert.equal(normalizeThreatCategoryValue('0'), '');
+	assert.equal(normalizeThreatCategoryValue({}), undefined);
+	assert.equal(normalizeThreatCategoryValue('Unknown Category'), undefined);
+
+	assert.equal(isThreatCategoryForThreat('Malware', 'Advanced Malware'), true);
+	assert.equal(isThreatCategoryForThreat('Unknown Threat', malwareCategoryValue), false);
+});
+
+test('omits the none threat category option from payload', () => {
+	const payload = buildReportPayload(
+		reportForms.minorIncident,
+		{
+			...validInitialReporter,
+			Summary: 'Nedidelis incidentas',
+			ImpactToPersonYesNo: noValue,
+			CyberIncidentResolvedYesNo: yesValue,
+			CriminalOffenceYesNo: noValue,
+			AffectedServices: 'Paslaugos',
+			FinancialLossYesNo: noValue,
+			ImpactFromThirdPartyYesNo: noValue,
+			CyberIncidentResolvedHelpYesNo: noValue,
+			CyberIncidentReportedYesNo: noValue,
+			FinalReportUpdateYesNo: yesValue,
+			Threat: 1,
+			ThreatCategory: 0,
+		},
+		true,
+	);
+
+	assert.equal(payload.Threat, minorIncidentThreatField?.options?.[0]?.value);
+	assert.equal(payload.ThreatCategory, undefined);
 });
 
 test('allows final report update without threat fields for minor incident', () => {
@@ -529,6 +795,36 @@ test('requires threat category when category-backed threat is selected', () => {
 	);
 });
 
+test('rejects threat category values that do not match the selected threat', () => {
+	const differentThreatCategoryValue = threatCategoryGroups.find(
+		(group) => group.threat !== malwareThreatValue,
+	)?.options[0]?.value as string;
+
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.minorIncident,
+				{
+					...validInitialReporter,
+					Summary: 'Nedidelis incidentas',
+					ImpactToPersonYesNo: noValue,
+					CyberIncidentResolvedYesNo: yesValue,
+					CriminalOffenceYesNo: noValue,
+					AffectedServices: 'Paslaugos',
+					FinancialLossYesNo: noValue,
+					ImpactFromThirdPartyYesNo: noValue,
+					CyberIncidentResolvedHelpYesNo: noValue,
+					CyberIncidentReportedYesNo: noValue,
+					FinalReportUpdateYesNo: yesValue,
+					Threat: malwareThreatValue,
+					ThreatCategory: differentThreatCategoryValue,
+				},
+				true,
+			),
+		/Threat Category must match the selected Threat/,
+	);
+});
+
 test('keeps final report update selectable', () => {
 	const finalReportUpdateProperty = getReportFieldProperties().find(
 		(property) => property.name === 'FinalReportUpdateYesNo',
@@ -543,18 +839,28 @@ test('keeps final report update selectable', () => {
 	);
 });
 
-test('keeps threat category fields visible while payload rules stay conditional', () => {
-	const malwareCategoryProperty = getReportFieldProperties().find(
-		(property) => property.name === 'ThreatCategoryMalware',
+test('exposes one all-category threat category field while payload rules stay conditional', () => {
+	const threatCategoryProperties = getReportFieldProperties().filter(
+		(property) => property.displayName === 'Threat Category',
 	);
-	const intrusionCategoryProperty = getReportFieldProperties().find(
-		(property) => property.name === 'ThreatCategoryIntrusion',
-	);
+	const threatCategoryProperty = threatCategoryProperties[0];
 
-	assert.equal(malwareCategoryProperty?.displayOptions?.show?.Threat, undefined);
-	assert.equal(intrusionCategoryProperty?.displayOptions?.show?.Threat, undefined);
-	assert.deepEqual(malwareCategoryProperty?.displayOptions?.show?.reportForm, ['minorIncident']);
-	assert.deepEqual(intrusionCategoryProperty?.displayOptions?.show?.reportForm, ['minorIncident']);
+	assert.equal(threatCategoryProperties.length, 1);
+	assert.equal(threatCategoryProperty?.name, 'ThreatCategory');
+	assert.equal(threatCategoryProperty?.displayOptions?.show?.Threat, undefined);
+	assert.deepEqual(threatCategoryProperty?.displayOptions?.show?.reportForm, ['minorIncident']);
+	assert.deepEqual((threatCategoryProperty?.options as INodePropertyOptions[] | undefined)?.[0], {
+		name: '0. None',
+		value: '',
+		description: 'No Threat Category',
+	});
+	assert.deepEqual(
+		(threatCategoryProperty?.options as INodePropertyOptions[] | undefined)?.map(
+			(option) => option.name,
+		),
+		getThreatCategoryOptions().map((option) => option.name),
+	);
+	assert.equal(threatCategoryProperty?.typeOptions?.loadOptionsMethod, undefined);
 });
 
 test('builds near miss payload with fixed incident type', () => {
@@ -593,4 +899,3 @@ test('allows partial update payloads when full validation is disabled', () => {
 		CyberIncidentRecurrenceYesNo: noValue,
 	});
 });
-

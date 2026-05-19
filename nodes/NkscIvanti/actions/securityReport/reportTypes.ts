@@ -17,11 +17,9 @@ export const reportFieldTypes = [
 	'options',
 ] as const;
 
-export type ReportFormId =
-	(typeof reportFormIds)[number];
+export type ReportFormId = (typeof reportFormIds)[number];
 
-export type ReportFieldType =
-	(typeof reportFieldTypes)[number];
+export type ReportFieldType = (typeof reportFieldTypes)[number];
 
 export type ReportField = {
 	displayName: string;
