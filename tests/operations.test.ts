@@ -36,6 +36,7 @@ function createExecuteContext(
 		continueOnFail: () => options?.continueOnFail ?? false,
 		helpers: {
 			httpRequest,
+			httpRequestWithAuthentication: httpRequest,
 			returnJsonArray(records: unknown) {
 				if (Array.isArray(records)) {
 					return records.map((json) => ({ json }));
@@ -77,12 +78,12 @@ test('insert execution posts the selected form payload and returns the sanitized
 	const result = await insertOperation.execute.call(context);
 
 	assert.deepEqual(result, [{ json: { RecId: 'new-record', Summary: 'Initial warning' } }]);
-	assert.equal(httpRequest.mock.calls[0][0].method, 'POST');
+	assert.equal(httpRequest.mock.calls[0][0], 'nkscIvantiApi');
+	assert.equal(httpRequest.mock.calls[0][1].method, 'POST');
 	assert.equal(
-		httpRequest.mock.calls[0][0].url,
+		httpRequest.mock.calls[0][1].url,
 		'https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__InitialReports',
 	);
-	assert.equal(httpRequest.mock.calls[0][0].headers.Authorization, 'rest_api_key=secret');
 });
 
 test('insert execution returns an error item when continue on fail is enabled', async () => {
@@ -166,7 +167,7 @@ test('insert report form selection wraps unsupported form errors', () => {
 test('insert response sanitizer leaves responses without OData context unchanged', () => {
 	const response = { RecId: 'record-1' };
 
-	assert.equal(insertOperation.sanitizeResponse(response), response);
+	assert.notEqual(insertOperation.sanitizeResponse(response), response);
 	assert.deepEqual(response, { RecId: 'record-1' });
 });
 
@@ -174,7 +175,7 @@ test('update execution patches the selected record', async () => {
 	const context = createExecuteContext({
 		formVersion: 'v1',
 		reportForm: 'majorIncident',
-		recordId: 'RID-123',
+		recordId: '0123456789abcdef0123456789ABCDEF',
 		validateRequiredFields: false,
 		Organization: 'Org',
 		Reporter: 'Reporter',
@@ -185,7 +186,7 @@ test('update execution patches the selected record', async () => {
 		InitialReportUpdateYesNo: 'Ne',
 		CyberIncidentReputationYesNo: 'Ne',
 		ImpactToPersonYesNo: 'Ne',
-		CyberIncidentResolvedYesNo: 'Ne',
+		CyberIncidentResolvedYesNo: 'Taip',
 		AffectedServices: 'Affected services',
 		FinancialLossYesNo: 'Ne',
 		ImpactFromThirdPartyYesNo: 'Ne',
@@ -196,18 +197,105 @@ test('update execution patches the selected record', async () => {
 		statusCode: 200,
 		body: {
 			'@odata.context': 'context',
-			RecId: 'RID-123',
+			RecId: '0123456789abcdef0123456789ABCDEF',
 		},
 	});
 
 	const result = await updateOperation.execute.call(context);
 
-	assert.deepEqual(result, [{ json: { RecId: 'RID-123' } }]);
-	assert.equal(httpRequest.mock.calls[0][0].method, 'PATCH');
+	assert.deepEqual(result, [{ json: { RecId: '0123456789abcdef0123456789ABCDEF' } }]);
+	assert.equal(httpRequest.mock.calls[0][0], 'nkscIvantiApi');
+	assert.equal(httpRequest.mock.calls[0][1].method, 'PATCH');
 	assert.equal(
-		httpRequest.mock.calls[0][0].url,
-		"https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports('RID-123')",
+		httpRequest.mock.calls[0][1].url,
+		"https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports('0123456789abcdef0123456789ABCDEF')",
 	);
+});
+
+test('update execution validates the full selected form when requested', async () => {
+	const context = createExecuteContext({
+		formVersion: 'v1',
+		reportForm: 'majorIncident',
+		recordId: '0123456789abcdef0123456789ABCDEF',
+		validateRequiredFields: true,
+		Organization: 'Org',
+		Reporter: 'Reporter',
+		ReporterEmail: 'reporter@example.com',
+		ReporterPhone: '+37060000000',
+		ReporterTitle: 'Lead',
+		Summary: 'Major incident',
+		ScopeOptions: ['ScopeOption2'],
+		InitialReportUpdateYesNo: 'Ne',
+		CyberIncidentReputationYesNo: 'Ne',
+		ImpactToPersonYesNo: 'Ne',
+		CyberIncidentResolvedYesNo: 'Taip',
+		AffectedServices: 'Affected services',
+		FinancialLossYesNo: 'Ne',
+		ImpactFromThirdPartyYesNo: 'Ne',
+		CyberIncidentRecurrenceYesNo: 'Ne',
+	});
+	const httpRequest = context.helpers.httpRequest as ReturnType<typeof vi.fn>;
+	httpRequest.mockResolvedValue({
+		statusCode: 200,
+		body: {
+			RecId: '0123456789abcdef0123456789ABCDEF',
+		},
+	});
+
+	const result = await updateOperation.execute.call(context);
+
+	assert.deepEqual(result, [{ json: { RecId: '0123456789abcdef0123456789ABCDEF' } }]);
+	assert.equal(httpRequest.mock.calls.length, 1);
+});
+
+test('update execution rejects incomplete full-form validation before PATCH', async () => {
+	const context = createExecuteContext(
+		{
+			formVersion: 'v1',
+			reportForm: 'majorIncident',
+			recordId: '0123456789abcdef0123456789ABCDEF',
+			validateRequiredFields: true,
+			Summary: 'Major incident',
+		},
+		{ continueOnFail: true },
+	);
+
+	const result = await updateOperation.execute.call(context);
+
+	assert.match(String(result[0]?.json?.error), /Reporter is required/);
+	assert.equal((context.helpers.httpRequest as ReturnType<typeof vi.fn>).mock.calls.length, 0);
+});
+
+test('update execution wraps validation errors when continue on fail is disabled', async () => {
+	const context = createExecuteContext({
+		formVersion: 'v1',
+		reportForm: 'majorIncident',
+		recordId: '0123456789abcdef0123456789ABCDEF',
+		validateRequiredFields: true,
+		Summary: 'Major incident',
+	});
+
+	await assert.rejects(
+		() => updateOperation.execute.call(context),
+		/Reporter is required/,
+	);
+});
+
+test('update execution rejects non-hex record IDs before building an OData path', async () => {
+	const context = createExecuteContext(
+		{
+			formVersion: 'v1',
+			reportForm: 'majorIncident',
+			recordId: "ABC') or 1 eq 1 or ('",
+			validateRequiredFields: false,
+		},
+		{ continueOnFail: true },
+	);
+
+	const result = await updateOperation.execute.call(context);
+
+	assert.equal(result[0]?.json?.error, 'Record ID must be a 32-character hex string');
+	assert.equal((context.helpers.httpRequest as ReturnType<typeof vi.fn>).mock.calls.length, 0);
 });
 
 test('update execution returns an error item when record ID is missing and continue on fail is enabled', async () => {
@@ -242,12 +330,13 @@ test('search execution returns every matching record', async () => {
 	const result = await searchOperation.execute.call(context);
 
 	assert.deepEqual(result, [{ json: { RecId: 'A' } }, { json: { RecId: 'B' } }]);
-	assert.equal(httpRequest.mock.calls[0][0].method, 'GET');
-	assert.deepEqual(httpRequest.mock.calls[0][0].qs, {
+	assert.equal(httpRequest.mock.calls[0][0], 'nkscIvantiApi');
+	assert.equal(httpRequest.mock.calls[0][1].method, 'GET');
+	assert.deepEqual(httpRequest.mock.calls[0][1].qs, {
 		$filter: "XSC_ExternalTicket_RecId eq 'EXT-123'",
 	});
 	assert.equal(
-		httpRequest.mock.calls[0][0].url,
+		httpRequest.mock.calls[0][1].url,
 		'https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports',
 	);
 });
@@ -264,6 +353,18 @@ test('search execution returns an error item when the external ticket ID is empt
 	const result = await searchOperation.execute.call(context);
 
 	assert.equal(result[0]?.json?.error, 'External Ticket ID is required');
+});
+
+test('search execution wraps unsupported report form errors when continue on fail is disabled', async () => {
+	const context = createExecuteContext({
+		reportForm: 'unsupportedForm',
+		externalTicketId: 'EXT-123',
+	});
+
+	await assert.rejects(
+		() => searchOperation.execute.call(context),
+		/Unsupported NKSC report form: unsupportedForm/,
+	);
 });
 
 test('router dispatches operations and rejects unsupported ones', async () => {

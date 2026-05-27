@@ -8,7 +8,7 @@ export default defineConfig({
 		exclude: ['node_modules', 'dist'],
 		coverage: {
 			provider: 'v8',
-			reports: ['text', 'lcov'],
+			reporter: ['text', 'lcov'],
 			thresholds: {
 				branches: 80,
 				perFile: true,

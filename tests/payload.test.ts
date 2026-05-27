@@ -122,6 +122,19 @@ test('subtracts the fixed n8n date picker offset before sending date/time fields
 	assert.equal(payload.DetectedOn, '2026-05-05T00:00:00');
 });
 
+test('preserves explicit timezone offsets when serializing date/time fields', () => {
+	const payload = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: '2026-04-29T14:30:12+05:30',
+		},
+		true,
+	);
+
+	assert.equal(payload.DetectedOn, '2026-04-29T09:00:12');
+});
+
 test('rejects future date/time field values', () => {
 	assert.throws(
 		() =>
@@ -470,6 +483,15 @@ test('extracts all matching records from OData search responses', () => {
 	assert.deepEqual(records, [{ RecId: 'newsrv1' }, { RecId: 'newsrv2' }]);
 });
 
+test('extracts a single OData object response without mutating it', () => {
+	const response = { '@odata.context': 'metadata', RecId: 'newsrv1' };
+
+	const records = extractODataRecords(response);
+
+	assert.deepEqual(records, [{ RecId: 'newsrv1' }]);
+	assert.deepEqual(response, { '@odata.context': 'metadata', RecId: 'newsrv1' });
+});
+
 test('requires one scope option for major incident insert validation', () => {
 	assert.throws(
 		() =>
@@ -552,11 +574,11 @@ test('requires conditional fields when toggles are selected', () => {
 		(error) =>
 			error instanceof Error &&
 			error.message.includes('At least one Loss Option must be selected') &&
-			error.message.includes('Affected Persons is required'),
+			error.message.includes('Affected Persons is required when Impact To Persons is Taip'),
 	);
 });
 
-test('recursively reports conditional fields behind missing conditional inputs', () => {
+test('reports conditional fields only when their controller has the matching value', () => {
 	assert.throws(
 		() =>
 			buildReportPayload(
@@ -579,9 +601,27 @@ test('recursively reports conditional fields behind missing conditional inputs',
 		(error) =>
 			error instanceof Error &&
 			error.message.includes('Threat is required') &&
-			error.message.includes('Threat Category is required') &&
 			error.message.includes('Cyber Incident Impact is required') &&
-			error.message.includes('Cyber Incident Mitigation is required'),
+			error.message.includes('Cyber Incident Mitigation is required') &&
+			!error.message.includes('Threat Category is required'),
+	);
+});
+
+test('does not require dependent details when a required Yes/No controller is missing', () => {
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.majorIncident,
+				{
+					...validMajorIncident,
+					CyberIncidentReputationYesNo: '',
+				},
+				true,
+			),
+		(error) =>
+			error instanceof Error &&
+			error.message.includes('Reputation Impact is required') &&
+			!error.message.includes('Reputation Impact Details is required'),
 	);
 });
 
@@ -898,4 +938,46 @@ test('allows partial update payloads when full validation is disabled', () => {
 		ImpactFromThirdPartyYesNo: noValue,
 		CyberIncidentRecurrenceYesNo: noValue,
 	});
+});
+
+test('enforces max length validation on insert payloads', () => {
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.majorIncident,
+				{
+					...validMajorIncident,
+					Summary: 'x'.repeat(256),
+				},
+				true,
+			),
+		/Summary must be 255 characters or fewer/,
+	);
+});
+
+test('enforces max length validation on partial update payloads', () => {
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.majorIncident,
+				{
+					Summary: 'x'.repeat(256),
+				},
+				false,
+			),
+		/Summary must be 255 characters or fewer/,
+	);
+});
+
+test('allows max length boundary values', () => {
+	const payload = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			Summary: 'x'.repeat(255),
+		},
+		true,
+	);
+
+	assert.equal(payload.Summary, 'x'.repeat(255));
 });

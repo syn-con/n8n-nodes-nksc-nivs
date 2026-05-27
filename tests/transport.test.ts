@@ -22,6 +22,7 @@ function createTransportContext(options?: {
 		getNode: () => ({ name: 'NKSC Ivanti' }),
 		helpers: {
 			httpRequest,
+			httpRequestWithAuthentication: httpRequest,
 		},
 	} as any;
 }
@@ -79,14 +80,15 @@ test('returns response bodies and forwards query parameters', async () => {
 	});
 
 	assert.deepEqual(result, { value: [{ RecId: 'A' }] });
+	assert.equal(httpRequest.mock.calls[0][0], 'nkscIvantiApi');
 	assert.equal(
-		httpRequest.mock.calls[0][0].url,
+		httpRequest.mock.calls[0][1].url,
 		'https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports',
 	);
-	assert.deepEqual(httpRequest.mock.calls[0][0].qs, {
+	assert.deepEqual(httpRequest.mock.calls[0][1].qs, {
 		$filter: "XSC_ExternalTicket_RecId eq 'EXT-123'",
 	});
-	assert.equal(httpRequest.mock.calls[0][0].headers.Authorization, 'rest_api_key=secret');
+	assert.equal(httpRequest.mock.calls[0][1].headers, undefined);
 });
 
 test('returns an empty object for no-content responses', async () => {
@@ -110,7 +112,7 @@ test('returns an empty object for no-content responses', async () => {
 	assert.deepEqual(result, {});
 });
 
-test('rejects non-2xx responses', async () => {
+test('rejects non-2xx responses with API error content', async () => {
 	const context = createTransportContext({
 		credentials: {
 			tenant: 'https://ivanti.example.local/HEAT/api',
@@ -125,12 +127,18 @@ test('rejects non-2xx responses', async () => {
 		},
 	});
 
-	await assert.rejects(() =>
-		nkscIvantiApiRequest.call(context, {
-			method: 'PATCH',
-			endpoint: "/odata/businessobject/XSC_SecurityReport__DetailReports('RID-1')",
-			body: { Summary: 'Updated' },
-		}),
+	await assert.rejects(
+		() =>
+			nkscIvantiApiRequest.call(context, {
+				method: 'PATCH',
+				endpoint: "/odata/businessobject/XSC_SecurityReport__DetailReports('RID-1')",
+				body: { Summary: 'Updated' },
+			}),
+		(error) =>
+			error instanceof Error &&
+			error.message.includes('Bad request') &&
+			'description' in error &&
+			(error as { description?: string }).description === 'Validation failed',
 	);
 });
 

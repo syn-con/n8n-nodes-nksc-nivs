@@ -3,6 +3,7 @@ import {
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeProperties,
+	NodeApiError,
 	NodeOperationError,
 	updateDisplayOptions,
 } from 'n8n-workflow';
@@ -57,10 +58,14 @@ async function executeItem(
 		});
 	} catch (error) {
 		if (this.continueOnFail()) {
-			return [{ json: { error: (error as Error).message } }];
+			return [{ json: { error: getErrorMessage(error) }, pairedItem: { item: itemIndex } }];
 		}
 
-		throw new NodeOperationError(this.getNode(), error as Error);
+		if (error instanceof NodeOperationError || error instanceof NodeApiError) {
+			throw error;
+		}
+
+		throw new NodeOperationError(this.getNode(), error as Error, { itemIndex });
 	}
 }
 
@@ -121,10 +126,11 @@ export function getSelectedReportForm(this: IExecuteFunctions, itemIndex: number
 
 export function sanitizeResponse(response: unknown): IDataObject {
 	const responseData = (response ?? {}) as IDataObject;
+	const { '@odata.context': _context, ...sanitizedResponse } = responseData;
 
-	if (responseData['@odata.context']) {
-		delete responseData['@odata.context'];
-	}
+	return sanitizedResponse;
+}
 
-	return responseData;
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

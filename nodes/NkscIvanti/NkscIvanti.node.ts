@@ -1,8 +1,9 @@
-import type {
+import {
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	NodeConnectionTypes,
 } from 'n8n-workflow';
 
 import { router } from './actions/router';
@@ -26,8 +27,8 @@ export class NkscIvanti implements INodeType {
 		defaults: {
 			name: 'NKSC Ivanti',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		usableAsTool: true,
 		credentials: [
 			{

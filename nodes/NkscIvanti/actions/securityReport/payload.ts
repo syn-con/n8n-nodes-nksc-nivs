@@ -25,6 +25,11 @@ type OneOfRequirement = {
 	message: string;
 };
 
+type RequiredField = {
+	name: string;
+	message?: string;
+};
+
 const ivantiDateTimeOffsetHours = 3;
 
 export function buildReportPayload(
@@ -94,8 +99,14 @@ export function validateReportPayload(
 
 	const requiredFields = getExpandedRequiredFields(form, payload);
 
-	for (const fieldName of requiredFields.fields) {
-		requireValue(payload, fieldName, getFieldDisplayName(form, fieldName), errors, errorSet);
+	for (const field of requiredFields.fields.values()) {
+		requireValue(
+			payload,
+			field.name,
+			field.message ?? `${getFieldDisplayName(form, field.name)} is required`,
+			errors,
+			errorSet,
+		);
 	}
 
 	for (const requirement of requiredFields.oneOf) {
@@ -108,13 +119,14 @@ export function validateReportPayload(
 function getExpandedRequiredFields(
 	form: ReportForm,
 	payload: IDataObject,
-): { fields: Set<string>; oneOf: OneOfRequirement[] } {
-	const fields = new Set<string>();
+): { fields: Map<string, RequiredField>; oneOf: OneOfRequirement[] } {
+	const fields = new Map<string, RequiredField>();
 	const oneOf = new Map<string, OneOfRequirement>();
 
 	for (const field of form.fields) {
 		if (field.required === true && field.type !== 'multiOptions') {
-			fields.add(getPayloadName(field));
+			const name = getPayloadName(field);
+			fields.set(name, { name });
 		}
 	}
 
@@ -127,13 +139,16 @@ function getExpandedRequiredFields(
 		changed = false;
 
 		for (const rule of form.conditionalRequired ?? []) {
-			if (!isConditionalRuleActiveOrPending(rule, fields, payload)) {
+			if (payload[rule.when] !== rule.is) {
 				continue;
 			}
 
 			for (const fieldName of rule.require) {
 				const previousSize = fields.size;
-				fields.add(fieldName);
+				fields.set(fieldName, {
+					name: fieldName,
+					message: `${getFieldDisplayName(form, fieldName)} is required when ${getFieldDisplayName(form, rule.when)} is ${formatConditionValue(rule.is)}`,
+				});
 				changed ||= fields.size !== previousSize;
 			}
 
@@ -168,24 +183,24 @@ function addOneOfRequirement(
 	return requirement;
 }
 
-function isConditionalRuleActiveOrPending(
-	rule: NonNullable<ReportForm['conditionalRequired']>[number],
-	requiredFields: Set<string>,
-	payload: IDataObject,
-): boolean {
-	if (payload[rule.when] === rule.is) {
-		return true;
-	}
-
-	return requiredFields.has(rule.when) && isEmptyValue(payload[rule.when] as PayloadValue);
-}
-
 function formatValidationErrors(errors: string[]): string {
 	if (errors.length === 1) {
 		return errors[0];
 	}
 
 	return `Missing required fields: ${errors.join('; ')}`;
+}
+
+function formatConditionValue(value: string | boolean): string {
+	if (value === true) {
+		return 'Yes';
+	}
+
+	if (value === false) {
+		return 'No';
+	}
+
+	return value;
 }
 
 function getFieldDisplayName(form: ReportForm, fieldName: string): string {
@@ -234,20 +249,25 @@ function formatDateTime(
 
 	try {
 		const exactDateTime = formatExactDateTime(value);
-		const parsedDateTime = tryToParseDateTime(exactDateTime, 'UTC').toUTC();
+		const parsedDateTime = tryToParseDateTime(exactDateTime.value, 'UTC').toUTC();
 		const now = tryToParseDateTime(options.now ?? new Date(), 'UTC').toUTC();
 
-		if (parsedDateTime.toFormat("yyyy-MM-dd'T'HH:mm:ss") !== exactDateTime) {
+		if (
+			!exactDateTime.hasExplicitTimeZone &&
+			parsedDateTime.toFormat("yyyy-MM-dd'T'HH:mm:ss") !== exactDateTime.value
+		) {
 			throw new Error(`${field.displayName} must be a valid date/time`);
 		}
 
-		const shiftedDateTime = parsedDateTime.minus({ hours: ivantiDateTimeOffsetHours });
-
-		if (shiftedDateTime.toMillis() > now.toMillis()) {
+		if (parsedDateTime.toMillis() > now.toMillis()) {
 			throw new Error(
 				`${field.displayName} cannot be in the future. Latest allowed value is ${now.toFormat("yyyy-MM-dd'T'HH:mm:ss")}`,
 			);
 		}
+
+		const shiftedDateTime = exactDateTime.hasExplicitTimeZone
+			? parsedDateTime
+			: parsedDateTime.minus({ hours: ivantiDateTimeOffsetHours });
 
 		return shiftedDateTime.toFormat("yyyy-MM-dd'T'HH:mm:ss");
 	} catch (error) {
@@ -259,7 +279,10 @@ function formatDateTime(
 	}
 }
 
-function formatExactDateTime(value: PayloadValue): string {
+function formatExactDateTime(value: PayloadValue): {
+	value: string | Date;
+	hasExplicitTimeZone: boolean;
+} {
 	if (typeof value === 'string') {
 		const exactDateTime = getExactDateTimeFromString(value);
 		if (exactDateTime !== undefined) {
@@ -267,22 +290,31 @@ function formatExactDateTime(value: PayloadValue): string {
 		}
 	}
 
-	return tryToParseDateTime(value, 'UTC').toUTC().toFormat("yyyy-MM-dd'T'HH:mm:ss");
+	return {
+		value: tryToParseDateTime(value, 'UTC').toUTC().toFormat("yyyy-MM-dd'T'HH:mm:ss"),
+		hasExplicitTimeZone: false,
+	};
 }
 
-function getExactDateTimeFromString(value: string): string | undefined {
+function getExactDateTimeFromString(
+	value: string,
+): { value: string; hasExplicitTimeZone: boolean } | undefined {
 	const match = value
 		.trim()
 		.match(
-			/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:\s*(?:Z|[+-]\d{2}:?\d{2}))?$/,
+			/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:\s*(Z|[+-]\d{2}:?\d{2}))?$/,
 		);
 	if (!match) {
 		return undefined;
 	}
 
-	const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
+	const [, year, month, day, hour = '00', minute = '00', second = '00', offset] = match;
+	const wallClockValue = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 
-	return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+	return {
+		value: offset === undefined ? wallClockValue : `${wallClockValue}${offset}`,
+		hasExplicitTimeZone: offset !== undefined,
+	};
 }
 
 function isEmptyValue(value: PayloadValue): boolean {
@@ -339,13 +371,13 @@ function validateFieldLengths(
 function requireValue(
 	payload: IDataObject,
 	name: string,
-	displayName: string,
+	message: string,
 	errors: string[],
 	errorSet: Set<string>,
 ): void {
 	const value = payload[name];
 	if (isEmptyValue(value as PayloadValue)) {
-		addValidationError(errors, errorSet, `${displayName} is required`);
+		addValidationError(errors, errorSet, message);
 	}
 }
 

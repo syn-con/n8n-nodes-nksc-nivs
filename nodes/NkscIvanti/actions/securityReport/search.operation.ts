@@ -3,6 +3,7 @@ import {
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeProperties,
+	NodeApiError,
 	NodeOperationError,
 	updateDisplayOptions,
 } from 'n8n-workflow';
@@ -49,9 +50,9 @@ async function executeItem(
 	try {
 		const reportForm = this.getNodeParameter('reportForm', itemIndex) as string;
 		const form = getReportForm(reportForm);
-		const externalTicketId = this.getNodeParameter('externalTicketId', itemIndex) as string;
+		const externalTicketId = this.getNodeParameter('externalTicketId', itemIndex);
 
-		if (!externalTicketId.trim()) {
+		if (typeof externalTicketId !== 'string' || externalTicketId.trim() === '') {
 			throw new NodeOperationError(this.getNode(), 'External Ticket ID is required');
 		}
 
@@ -70,10 +71,14 @@ async function executeItem(
 		});
 	} catch (error) {
 		if (this.continueOnFail()) {
-			return [{ json: { error: (error as Error).message } }];
+			return [{ json: { error: getErrorMessage(error) }, pairedItem: { item: itemIndex } }];
 		}
 
-		throw new NodeOperationError(this.getNode(), error as Error);
+		if (error instanceof NodeOperationError || error instanceof NodeApiError) {
+			throw error;
+		}
+
+		throw new NodeOperationError(this.getNode(), error as Error, { itemIndex });
 	}
 }
 
@@ -94,4 +99,8 @@ export function extractODataRecords(response: unknown): IDataObject[] {
 	}
 
 	return [responseData];
+}
+
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

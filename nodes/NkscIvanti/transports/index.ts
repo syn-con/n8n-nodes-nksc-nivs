@@ -8,6 +8,7 @@ import {
 	ILoadOptionsFunctions,
 	JsonObject,
 	NodeApiError,
+	NodeOperationError,
 } from 'n8n-workflow';
 
 type NkscIvantiApiRequestContext =
@@ -24,23 +25,32 @@ type NkscIvantiApiRequestOptions = {
 	headers?: IDataObject;
 };
 
+type NkscIvantiCredentials = {
+	tenant: string;
+	apiKey: string;
+};
+
+type FullHttpResponse = {
+	statusCode: number;
+	body?: unknown;
+};
+
 export async function nkscIvantiApiRequest(
 	this: NkscIvantiApiRequestContext,
 	requestOptions: NkscIvantiApiRequestOptions,
 ): Promise<unknown> {
-	const credential = await this.getCredentials('nkscIvantiApi');
+	const credential = (await this.getCredentials('nkscIvantiApi')) as
+		| NkscIvantiCredentials
+		| undefined;
 
 	if (credential === undefined) {
-		throw new Error('No NKSC Ivanti credentials got returned');
+		throw new NodeOperationError(this.getNode(), 'No NKSC Ivanti credentials got returned');
 	}
 
-	const baseUrl = buildApiBaseUrl(credential.tenant as string);
+	const baseUrl = buildApiBaseUrl(credential.tenant);
 
 	const options: IHttpRequestOptions = {
-		headers: {
-			Authorization: `rest_api_key=${credential.apiKey}`,
-			...requestOptions.headers,
-		},
+		headers: requestOptions.headers,
 		method: requestOptions.method,
 		body: requestOptions.body,
 		url: `${baseUrl}${requestOptions.endpoint}`,
@@ -54,13 +64,17 @@ export async function nkscIvantiApiRequest(
 	}
 
 	try {
-		const response = await this.helpers.httpRequest(options);
+		const response = (await this.helpers.httpRequestWithAuthentication.call(
+			this,
+			'nkscIvantiApi',
+			options,
+		)) as FullHttpResponse | undefined;
 
 		if (response && response.statusCode > 299) {
-			const errorResponse = response.body as JsonObject;
+			const errorResponse = getErrorResponseBody(response.body);
 			throw new NodeApiError(this.getNode(), errorResponse, {
-				description: errorResponse.description?.toString(),
-				message: errorResponse.message?.toString(),
+				description: getStringProperty(errorResponse, 'description'),
+				message: getStringProperty(errorResponse, 'message'),
 			});
 		}
 
@@ -70,6 +84,10 @@ export async function nkscIvantiApiRequest(
 
 		return response?.body ?? response;
 	} catch (error) {
+		if (error instanceof NodeApiError || error instanceof NodeOperationError) {
+			throw error;
+		}
+
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
 }
@@ -80,4 +98,16 @@ export function buildApiBaseUrl(apiEndpoint: string): string {
 	return /^https?:\/\//i.test(normalizedEndpoint)
 		? normalizedEndpoint
 		: `https://${normalizedEndpoint}`;
+}
+
+function getErrorResponseBody(body: unknown): JsonObject {
+	return typeof body === 'object' && body !== null && !Array.isArray(body)
+		? (body as JsonObject)
+		: {};
+}
+
+function getStringProperty(object: JsonObject, key: string): string | undefined {
+	const value = object[key];
+
+	return typeof value === 'string' ? value : undefined;
 }

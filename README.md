@@ -27,8 +27,8 @@ It handles:
 | --- | --- | --- |
 | Initial warning | `XSC_SecurityReport__InitialReports` | Initial warning records |
 | Major cyber incident | `XSC_SecurityReport__DetailReports` | `TypeOfCyberIncident` is fixed to `Didelis` |
-| Minor cyber incident | `XSC_SecurityReport__DetailReports` | Includes threat and final report fields |
-| Near miss | `XSC_SecurityReport__DetailReports` | Smallest detail-report payload |
+| Minor cyber incident | `XSC_SecurityReport__DetailReports` | `TypeOfCyberIncident` is fixed to `Nedidelis`; includes threat and final report fields |
+| Near miss | `XSC_SecurityReport__DetailReports` | `TypeOfCyberIncident` is fixed to `Vos neįvykęs` |
 
 ## How It Works
 
@@ -82,7 +82,7 @@ Use the `NKSC Ivanti API` credential.
 
 | Field | Purpose |
 | --- | --- |
-| `API Endpoint` | Full Ivanti API endpoint URL |
+| `API Endpoint` | Full Ivanti API endpoint URL. Defaults to `https://incidentai.nksc.lt/HEAT/api` |
 | `API Key` | REST API key used for authentication |
 
 Behavior:
@@ -90,6 +90,7 @@ Behavior:
 - bare hostnames are normalized to HTTPS
 - explicit `http://...` URLs are preserved
 - trailing slashes are trimmed before the request URL is built
+- n8n tests the credential with `GET /odata/businessobject/XSC_SecurityReport__DetailReports`
 
 Examples:
 

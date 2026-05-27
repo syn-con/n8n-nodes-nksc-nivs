@@ -2,6 +2,7 @@ import {
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeProperties,
+	NodeApiError,
 	NodeOperationError,
 	updateDisplayOptions,
 } from 'n8n-workflow';
@@ -25,7 +26,7 @@ export const properties: INodeProperties[] = [
 		name: 'validateRequiredFields',
 		type: 'boolean',
 		default: false,
-		description: 'Whether to validate the full major incident form before updating',
+		description: 'Whether to validate the full selected report form before updating',
 	},
 	...getReportFieldProperties(),
 ];
@@ -55,9 +56,16 @@ async function executeItem(
 	try {
 		const form = getSelectedReportForm.call(this, itemIndex);
 
-		const recordId = this.getNodeParameter('recordId', itemIndex) as string;
-		if (!recordId) {
+		const recordId = this.getNodeParameter('recordId', itemIndex);
+		if (typeof recordId !== 'string' || recordId.trim() === '') {
 			throw new NodeOperationError(this.getNode(), 'Record ID is required');
+		}
+
+		const trimmedRecordId = recordId.trim();
+		if (!/^[0-9A-Fa-f]{32}$/.test(trimmedRecordId)) {
+			throw new NodeOperationError(this.getNode(), 'Record ID must be a 32-character hex string', {
+				itemIndex,
+			});
 		}
 
 		const validateRequiredFields = this.getNodeParameter(
@@ -68,7 +76,7 @@ async function executeItem(
 		const body = buildReportPayload(form, payloadInput, validateRequiredFields);
 		const response = await nkscIvantiApiRequest.call(this, {
 			method: 'PATCH',
-			endpoint: `/odata/businessobject/${form.objectName}('${recordId}')`,
+			endpoint: `/odata/businessobject/${form.objectName}('${trimmedRecordId}')`,
 			body,
 		});
 
@@ -78,9 +86,17 @@ async function executeItem(
 		);
 	} catch (error) {
 		if (this.continueOnFail()) {
-			return [{ json: { error: (error as Error).message } }];
+			return [{ json: { error: getErrorMessage(error) }, pairedItem: { item: itemIndex } }];
 		}
 
-		throw new NodeOperationError(this.getNode(), error as Error);
+		if (error instanceof NodeOperationError || error instanceof NodeApiError) {
+			throw error;
+		}
+
+		throw new NodeOperationError(this.getNode(), error as Error, { itemIndex });
 	}
+}
+
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

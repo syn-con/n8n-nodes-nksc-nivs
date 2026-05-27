@@ -1,4 +1,10 @@
-import type { Icon, ICredentialTestRequest, ICredentialType, INodeProperties } from 'n8n-workflow';
+import type {
+	IAuthenticateGeneric,
+	Icon,
+	ICredentialTestRequest,
+	ICredentialType,
+	INodeProperties,
+} from 'n8n-workflow';
 
 export class NkscIvantiApi implements ICredentialType {
 	name = 'nkscIvantiApi';
@@ -32,15 +38,21 @@ export class NkscIvantiApi implements ICredentialType {
 		},
 	];
 
+	authenticate: IAuthenticateGeneric = {
+		type: 'generic',
+		properties: {
+			headers: {
+				Authorization: '={{ "rest_api_key=" + $credentials.apiKey }}',
+			},
+		},
+	};
+
 	test: ICredentialTestRequest = {
 		request: {
 			baseURL:
 				'={{ ($credentials.tenant.match(/^https?:\\/\\//i) ? $credentials.tenant : "https://" + $credentials.tenant).replace(/\\/+$/, "") + "/odata/businessobject" }}',
 			method: 'GET',
 			url: '/XSC_SecurityReport__DetailReports',
-			headers: {
-				Authorization: '={{ "rest_api_key=" + $credentials.apiKey }}',
-			},
 		},
 	};
 }

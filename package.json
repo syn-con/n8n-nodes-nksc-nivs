@@ -8,15 +8,17 @@
     "ivanti"
   ],
   "author": {
-    "name": "UAB Synergy"
+    "name": "UAB Synergy",
+    "email": "info@synergy.lt"
   },
   "license": "MIT",
+  "homepage": "https://github.com/syn-con/n8n-nodes-nksc-ivanti#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/syn-con/n8n-nodes-nksc-ivanti.git"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+  "bugs": {
+    "url": "https://github.com/syn-con/n8n-nodes-nksc-ivanti/issues"
   },
   "engines": {
     "node": ">=20.15"
