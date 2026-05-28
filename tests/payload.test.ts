@@ -109,7 +109,7 @@ test('builds a major incident payload with fixed incident type', () => {
 	assert.equal(payload.XSC_ExternalTicket_RecId, 'EXT-123');
 });
 
-test('subtracts the fixed n8n date picker offset before sending date/time fields', () => {
+test('converts Lithuanian summer time inputs to UTC before sending date/time fields', () => {
 	const payload = buildReportPayload(
 		reportForms.majorIncident,
 		{
@@ -122,7 +122,20 @@ test('subtracts the fixed n8n date picker offset before sending date/time fields
 	assert.equal(payload.DetectedOn, '2026-05-05T00:00:00');
 });
 
-test('preserves explicit timezone offsets when serializing date/time fields', () => {
+test('converts Lithuanian winter time inputs to UTC before sending date/time fields', () => {
+	const payload = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: '2026-01-05 03:00:00',
+		},
+		true,
+	);
+
+	assert.equal(payload.DetectedOn, '2026-01-05T01:00:00');
+});
+
+test('strips explicit timezone offsets before applying Lithuania local conversion', () => {
 	const payload = buildReportPayload(
 		reportForms.majorIncident,
 		{
@@ -132,7 +145,66 @@ test('preserves explicit timezone offsets when serializing date/time fields', ()
 		true,
 	);
 
-	assert.equal(payload.DetectedOn, '2026-04-29T09:00:12');
+	const payloadWithLithuanianWinterOffset = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: '2026-04-29T14:30:12+02:00',
+		},
+		true,
+	);
+
+	const payloadWithLithuanianSummerOffset = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: '2026-04-29T14:30:12+03:00',
+		},
+		true,
+	);
+
+	const payloadWithoutColonOffset = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: '2026-04-29T14:30:12+0300',
+		},
+		true,
+	);
+
+	assert.equal(payload.DetectedOn, '2026-04-29T11:30:12');
+	assert.equal(payloadWithLithuanianWinterOffset.DetectedOn, '2026-04-29T11:30:12');
+	assert.equal(payloadWithLithuanianSummerOffset.DetectedOn, '2026-04-29T11:30:12');
+	assert.equal(payloadWithoutColonOffset.DetectedOn, '2026-04-29T11:30:12');
+});
+
+test('serializes Date expression values without double-subtracting Lithuania offset', () => {
+	const payload = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: new Date('2026-05-05T00:00:00Z'),
+		},
+		true,
+	);
+
+	assert.equal(payload.DetectedOn, '2026-05-05T00:00:00');
+});
+
+test('checks future date/time values after Lithuanian local time is converted to UTC', () => {
+	const payload = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: '2026-05-28T12:01:10',
+		},
+		true,
+		{
+			now: new Date('2026-05-28T09:01:21Z'),
+		},
+	);
+
+	assert.equal(payload.DetectedOn, '2026-05-28T09:01:10');
 });
 
 test('rejects future date/time field values', () => {
@@ -149,7 +221,7 @@ test('rejects future date/time field values', () => {
 					now: new Date('2026-05-19T12:00:00Z'),
 				},
 			),
-		/Detected On cannot be in the future/,
+		/Detected On cannot be in the future. Latest allowed value is 2026-05-19T15:00:00/,
 	);
 });
 
@@ -918,7 +990,7 @@ test('builds near miss payload with fixed incident type', () => {
 	assert.equal(payload.DetailReportDescription, 'Pranesimas');
 });
 
-test('allows partial update payloads when full validation is disabled', () => {
+test('allows full-form update payloads when full validation is disabled', () => {
 	const payload = buildReportPayload(
 		reportForms.majorIncident,
 		{
@@ -940,6 +1012,24 @@ test('allows partial update payloads when full validation is disabled', () => {
 	});
 });
 
+test('builds selected-field update payloads without fixed fields or unselected defaults', () => {
+	const payload = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			Summary: 'Tik pavadinimo atnaujinimas',
+		},
+		false,
+		{
+			includedFields: ['Summary'],
+			includeFixedFields: false,
+		},
+	);
+
+	assert.deepEqual(payload, {
+		Summary: 'Tik pavadinimo atnaujinimas',
+	});
+});
+
 test('enforces max length validation on insert payloads', () => {
 	assert.throws(
 		() =>
@@ -955,7 +1045,7 @@ test('enforces max length validation on insert payloads', () => {
 	);
 });
 
-test('enforces max length validation on partial update payloads', () => {
+test('enforces max length validation on update payloads', () => {
 	assert.throws(
 		() =>
 			buildReportPayload(

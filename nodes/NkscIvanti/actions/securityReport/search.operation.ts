@@ -13,6 +13,7 @@ import { sanitizeResponse } from './insert.operation';
 import { getReportForm } from './reportForms';
 
 export const externalTicketIdField = 'XSC_ExternalTicket_RecId';
+export const defaultSearchLimit = 10;
 
 export const properties: INodeProperties[] = [
 	{
@@ -22,6 +23,16 @@ export const properties: INodeProperties[] = [
 		default: '',
 		required: true,
 		description: 'External ticket RecId to search for',
+	},
+	{
+		displayName: 'Search Limit',
+		name: 'searchLimit',
+		type: 'number',
+		default: defaultSearchLimit,
+		description: 'Maximum number of matching reports to return',
+		typeOptions: {
+			minValue: 1,
+		},
 	},
 ];
 
@@ -51,6 +62,7 @@ async function executeItem(
 		const reportForm = this.getNodeParameter('reportForm', itemIndex) as string;
 		const form = getReportForm(reportForm);
 		const externalTicketId = this.getNodeParameter('externalTicketId', itemIndex);
+		const searchLimit = getSearchLimit.call(this, itemIndex);
 
 		if (typeof externalTicketId !== 'string' || externalTicketId.trim() === '') {
 			throw new NodeOperationError(this.getNode(), 'External Ticket ID is required');
@@ -61,6 +73,7 @@ async function executeItem(
 			endpoint: `/odata/businessobject/${form.objectName}`,
 			qs: {
 				$filter: buildExternalTicketFilter(externalTicketId),
+				$top: searchLimit,
 			},
 		});
 
@@ -80,6 +93,17 @@ async function executeItem(
 
 		throw new NodeOperationError(this.getNode(), error as Error, { itemIndex });
 	}
+}
+
+export function getSearchLimit(this: IExecuteFunctions, itemIndex: number): number {
+	const rawLimit = this.getNodeParameter('searchLimit', itemIndex, defaultSearchLimit);
+	const limit = typeof rawLimit === 'number' ? rawLimit : Number(rawLimit);
+
+	if (!Number.isInteger(limit) || limit < 1) {
+		throw new NodeOperationError(this.getNode(), 'Search Limit must be a positive integer');
+	}
+
+	return limit;
 }
 
 export function buildExternalTicketFilter(externalTicketId: string): string {

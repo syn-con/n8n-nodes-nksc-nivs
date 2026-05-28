@@ -48,20 +48,7 @@ export async function nkscIvantiApiRequest(
 	}
 
 	const baseUrl = buildApiBaseUrl(credential.tenant);
-
-	const options: IHttpRequestOptions = {
-		headers: requestOptions.headers,
-		method: requestOptions.method,
-		body: requestOptions.body,
-		url: `${baseUrl}${requestOptions.endpoint}`,
-		json: true,
-		returnFullResponse: true,
-		ignoreHttpStatusErrors: true,
-	};
-
-	if (requestOptions.qs !== undefined) {
-		options.qs = requestOptions.qs;
-	}
+	const options = buildHttpRequestOptions(baseUrl, credential.apiKey, requestOptions);
 
 	try {
 		const response = (await this.helpers.httpRequestWithAuthentication.call(
@@ -69,20 +56,7 @@ export async function nkscIvantiApiRequest(
 			'nkscIvantiApi',
 			options,
 		)) as FullHttpResponse | undefined;
-
-		if (response && response.statusCode > 299) {
-			const errorResponse = getErrorResponseBody(response.body);
-			throw new NodeApiError(this.getNode(), errorResponse, {
-				description: getStringProperty(errorResponse, 'description'),
-				message: getStringProperty(errorResponse, 'message'),
-			});
-		}
-
-		if (response && response.statusCode === 204) {
-			return {};
-		}
-
-		return response?.body ?? response;
+		return parseIvantiResponse(this, response);
 	} catch (error) {
 		if (error instanceof NodeApiError || error instanceof NodeOperationError) {
 			throw error;
@@ -98,6 +72,50 @@ export function buildApiBaseUrl(apiEndpoint: string): string {
 	return /^https?:\/\//i.test(normalizedEndpoint)
 		? normalizedEndpoint
 		: `https://${normalizedEndpoint}`;
+}
+
+function buildHttpRequestOptions(
+	baseUrl: string,
+	apiKey: string,
+	requestOptions: NkscIvantiApiRequestOptions,
+): IHttpRequestOptions {
+	const options: IHttpRequestOptions = {
+		headers: {
+			Authorization: `rest_api_key=${apiKey}`,
+			...requestOptions.headers,
+		},
+		method: requestOptions.method,
+		body: requestOptions.body,
+		url: `${baseUrl}${requestOptions.endpoint}`,
+		json: true,
+		returnFullResponse: true,
+		ignoreHttpStatusErrors: true,
+	};
+
+	if (requestOptions.qs !== undefined) {
+		options.qs = requestOptions.qs;
+	}
+
+	return options;
+}
+
+function parseIvantiResponse(
+	node: NkscIvantiApiRequestContext,
+	response: FullHttpResponse | undefined,
+): unknown {
+	if (response && response.statusCode > 299) {
+		const errorResponse = getErrorResponseBody(response.body);
+		throw new NodeApiError(node.getNode(), errorResponse, {
+			description: getStringProperty(errorResponse, 'description'),
+			message: getStringProperty(errorResponse, 'message'),
+		});
+	}
+
+	if (response && response.statusCode === 204) {
+		return {};
+	}
+
+	return response?.body ?? response;
 }
 
 function getErrorResponseBody(body: unknown): JsonObject {

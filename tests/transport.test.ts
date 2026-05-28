@@ -88,7 +88,7 @@ test('returns response bodies and forwards query parameters', async () => {
 	assert.deepEqual(httpRequest.mock.calls[0][1].qs, {
 		$filter: "XSC_ExternalTicket_RecId eq 'EXT-123'",
 	});
-	assert.equal(httpRequest.mock.calls[0][1].headers, undefined);
+	assert.equal(httpRequest.mock.calls[0][1].headers.Authorization, 'rest_api_key=secret');
 });
 
 test('returns an empty object for no-content responses', async () => {

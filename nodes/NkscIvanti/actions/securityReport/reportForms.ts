@@ -26,63 +26,6 @@ export const reportFormOptions: INodePropertyOptions[] = Object.values(reportFor
 
 export const defaultReportForm: ReportFormId = 'majorIncident';
 
-const fieldDisplayOrder = [
-	'Organization',
-	'Reporter',
-	'ReporterEmail',
-	'ReporterPhone',
-	'ReporterTitle',
-	'XSC_ExternalTicket_RecId',
-	'Summary',
-	'DetectedOn',
-	'TypeOfCyberIncident',
-	'AffectedEntities',
-	'DetailReportDescription',
-	'ScopeOptionsExpanded',
-	'ScopeOptions',
-	'ScopeOption1',
-	'ScopeOption2',
-	'ScopeOption3',
-	'ScopeOption4',
-	'ScopeOption5',
-	'ScopeOption6',
-	'ScopeOption7',
-	'ScopeOption11',
-	'InitialReportUpdateYesNo',
-	'CyberIncidentReputationYesNo',
-	'CyberIncidentReputationValue',
-	'ResolvedOn',
-	'CriminalOffenceYesNo',
-	'Evidence',
-	'ImpactToPersonYesNo',
-	'LossOptionsExpanded',
-	'LossOptions',
-	'LossOption1',
-	'LossOption2',
-	'LossOption3',
-	'AffectedPersons',
-	'CyberIncidentResolvedYesNo',
-	'CyberIncidentResolvedValue',
-	'AffectedServices',
-	'FinancialLossYesNo',
-	'FinancialLossValue',
-	'ImpactFromThirdPartyYesNo',
-	'ImpactFromThirdPartyValue',
-	'CyberIncidentResolvedHelpYesNo',
-	'CyberIncidentResolvedHelpValue',
-	'CyberIncidentRecurrenceYesNo',
-	'CyberIncidentReportedYesNo',
-	'CyberIncidentReportedValue',
-	'FinalReportUpdateYesNo',
-	'Threat',
-	'ThreatCategory',
-	'CyberIncidentImpact',
-	'CyberIncidentMitigation',
-	'IntergovernmentalImpactYesNo',
-	'IntergovernmentalImpactValue',
-	'OtherInformation',
-];
-
 export function getReportForm(formId: string): ReportForm {
 	const form = reportForms[formId as ReportFormId];
 	if (!form) {
@@ -127,7 +70,7 @@ export function getReportFieldProperties(): INodeProperties[] {
 		}
 	}
 
-	return [...propertiesByKey.values()].sort(comparePropertiesByDisplayOrder);
+	return [...propertiesByKey.values()];
 }
 
 function createReportFieldProperty(
@@ -175,22 +118,6 @@ function getPropertyMergeKey(formField: ReportField): string {
 		required: formField.required === true,
 		visibleWhen: formField.visibleWhen ?? {},
 	});
-}
-
-function comparePropertiesByDisplayOrder(left: INodeProperties, right: INodeProperties): number {
-	const leftIndex = getDisplayOrderIndex(left.name);
-	const rightIndex = getDisplayOrderIndex(right.name);
-
-	if (leftIndex === rightIndex) {
-		return 0;
-	}
-
-	return leftIndex - rightIndex;
-}
-
-function getDisplayOrderIndex(name: string): number {
-	const index = fieldDisplayOrder.indexOf(name);
-	return index === -1 ? fieldDisplayOrder.length : index;
 }
 
 function getDefaultValue(formField: ReportField): string | boolean | string[] {

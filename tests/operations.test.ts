@@ -61,6 +61,7 @@ test('insert execution posts the selected form payload and returns the sanitized
 		ReporterPhone: '+37060000000',
 		ReporterTitle: 'Lead',
 		Summary: 'Initial warning',
+		DetectedOn: '2026-04-29T14:30:12+03:00',
 		CriminalOffenceYesNo: 'Ne',
 		CyberIncidentResolvedHelpYesNo: 'Taip',
 		CyberIncidentResolvedHelpValue: 'Support provided',
@@ -84,6 +85,7 @@ test('insert execution posts the selected form payload and returns the sanitized
 		httpRequest.mock.calls[0][1].url,
 		'https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__InitialReports',
 	);
+	assert.equal(httpRequest.mock.calls[0][1].body.DetectedOn, '2026-04-29T11:30:12');
 });
 
 test('insert execution returns an error item when continue on fail is enabled', async () => {
@@ -176,21 +178,10 @@ test('update execution patches the selected record', async () => {
 		formVersion: 'v1',
 		reportForm: 'majorIncident',
 		recordId: '0123456789abcdef0123456789ABCDEF',
-		validateRequiredFields: false,
-		Organization: 'Org',
-		Reporter: 'Reporter',
-		ReporterEmail: 'reporter@example.com',
-		ReporterPhone: '+37060000000',
-		ReporterTitle: 'Lead',
+		updateMode: 'selectedFields',
+		fieldsToUpdate: ['Summary', 'CyberIncidentResolvedYesNo'],
 		Summary: 'Major incident',
-		InitialReportUpdateYesNo: 'Ne',
-		CyberIncidentReputationYesNo: 'Ne',
-		ImpactToPersonYesNo: 'Ne',
 		CyberIncidentResolvedYesNo: 'Taip',
-		AffectedServices: 'Affected services',
-		FinancialLossYesNo: 'Ne',
-		ImpactFromThirdPartyYesNo: 'Ne',
-		CyberIncidentRecurrenceYesNo: 'Ne',
 	});
 	const httpRequest = context.helpers.httpRequest as ReturnType<typeof vi.fn>;
 	httpRequest.mockResolvedValue({
@@ -210,6 +201,32 @@ test('update execution patches the selected record', async () => {
 		httpRequest.mock.calls[0][1].url,
 		"https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports('0123456789abcdef0123456789ABCDEF')",
 	);
+	assert.deepEqual(httpRequest.mock.calls[0][1].body, {
+		Summary: 'Major incident',
+		CyberIncidentResolvedYesNo: 'Taip',
+	});
+});
+
+test('update execution accepts numbered field selections from expressions', async () => {
+	const context = createExecuteContext({
+		formVersion: 'v1',
+		reportForm: 'majorIncident',
+		recordId: '0123456789abcdef0123456789ABCDEF',
+		updateMode: 'selectedFields',
+		fieldsToUpdate: '7',
+		Summary: 'Major incident',
+	});
+	const httpRequest = context.helpers.httpRequest as ReturnType<typeof vi.fn>;
+	httpRequest.mockResolvedValue({
+		statusCode: 200,
+		body: {
+			RecId: '0123456789abcdef0123456789ABCDEF',
+		},
+	});
+
+	await updateOperation.execute.call(context);
+
+	assert.deepEqual(httpRequest.mock.calls[0][1].body, { Summary: 'Major incident' });
 });
 
 test('update execution validates the full selected form when requested', async () => {
@@ -217,6 +234,7 @@ test('update execution validates the full selected form when requested', async (
 		formVersion: 'v1',
 		reportForm: 'majorIncident',
 		recordId: '0123456789abcdef0123456789ABCDEF',
+		updateMode: 'fullForm',
 		validateRequiredFields: true,
 		Organization: 'Org',
 		Reporter: 'Reporter',
@@ -254,6 +272,7 @@ test('update execution rejects incomplete full-form validation before PATCH', as
 			formVersion: 'v1',
 			reportForm: 'majorIncident',
 			recordId: '0123456789abcdef0123456789ABCDEF',
+			updateMode: 'fullForm',
 			validateRequiredFields: true,
 			Summary: 'Major incident',
 		},
@@ -271,6 +290,7 @@ test('update execution wraps validation errors when continue on fail is disabled
 		formVersion: 'v1',
 		reportForm: 'majorIncident',
 		recordId: '0123456789abcdef0123456789ABCDEF',
+		updateMode: 'fullForm',
 		validateRequiredFields: true,
 		Summary: 'Major incident',
 	});
@@ -313,6 +333,42 @@ test('update execution returns an error item when record ID is missing and conti
 	assert.equal(result[0]?.json?.error, 'Record ID is required');
 });
 
+test('update execution rejects empty selected-field payloads before PATCH', async () => {
+	const context = createExecuteContext(
+		{
+			formVersion: 'v1',
+			reportForm: 'majorIncident',
+			recordId: '0123456789abcdef0123456789ABCDEF',
+			updateMode: 'selectedFields',
+			fieldsToUpdate: ['Summary'],
+			Summary: '',
+		},
+		{ continueOnFail: true },
+	);
+
+	const result = await updateOperation.execute.call(context);
+
+	assert.equal(result[0]?.json?.error, 'At least one selected field must have a value to update');
+	assert.equal((context.helpers.httpRequest as ReturnType<typeof vi.fn>).mock.calls.length, 0);
+});
+
+test('normalizes update field selections from labels, field names, and numbers', () => {
+	assert.deepEqual(
+		updateOperation.normalizeFieldsToUpdate(reportForms.majorIncident, [
+			'1. Organization',
+			'Summary',
+			7,
+			'[8]',
+		]),
+		['Organization', 'Summary', 'DetectedOn'],
+	);
+
+	assert.throws(
+		() => updateOperation.normalizeFieldsToUpdate(reportForms.majorIncident, '999'),
+		/Unknown Fields To Update selection: 999/,
+	);
+});
+
 test('search execution returns every matching record', async () => {
 	const context = createExecuteContext({
 		reportForm: 'minorIncident',
@@ -334,11 +390,35 @@ test('search execution returns every matching record', async () => {
 	assert.equal(httpRequest.mock.calls[0][1].method, 'GET');
 	assert.deepEqual(httpRequest.mock.calls[0][1].qs, {
 		$filter: "XSC_ExternalTicket_RecId eq 'EXT-123'",
+		$top: 10,
 	});
 	assert.equal(
 		httpRequest.mock.calls[0][1].url,
 		'https://ivanti.example.local/HEAT/api/odata/businessobject/XSC_SecurityReport__DetailReports',
 	);
+});
+
+test('search execution respects an explicit search limit', async () => {
+	const context = createExecuteContext({
+		reportForm: 'minorIncident',
+		externalTicketId: 'EXT-123',
+		searchLimit: 25,
+	});
+	const httpRequest = context.helpers.httpRequest as ReturnType<typeof vi.fn>;
+	httpRequest.mockResolvedValue({
+		statusCode: 200,
+		body: {
+			'@odata.context': 'context',
+			value: [{ RecId: 'A' }],
+		},
+	});
+
+	await searchOperation.execute.call(context);
+
+	assert.deepEqual(httpRequest.mock.calls[0][1].qs, {
+		$filter: "XSC_ExternalTicket_RecId eq 'EXT-123'",
+		$top: 25,
+	});
 });
 
 test('search execution returns an error item when the external ticket ID is empty and continue on fail is enabled', async () => {
@@ -353,6 +433,22 @@ test('search execution returns an error item when the external ticket ID is empt
 	const result = await searchOperation.execute.call(context);
 
 	assert.equal(result[0]?.json?.error, 'External Ticket ID is required');
+});
+
+test('search execution returns an error item when the search limit is invalid and continue on fail is enabled', async () => {
+	const context = createExecuteContext(
+		{
+			reportForm: 'minorIncident',
+			externalTicketId: 'EXT-123',
+			searchLimit: 0,
+		},
+		{ continueOnFail: true },
+	);
+
+	const result = await searchOperation.execute.call(context);
+
+	assert.equal(result[0]?.json?.error, 'Search Limit must be a positive integer');
+	assert.equal((context.helpers.httpRequest as ReturnType<typeof vi.fn>).mock.calls.length, 0);
 });
 
 test('search execution wraps unsupported report form errors when continue on fail is disabled', async () => {

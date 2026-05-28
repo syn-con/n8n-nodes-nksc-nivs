@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 
 import { NkscIvantiApi } from '../credentials/NkscIvantiApi.credentials';
 import { NkscIvanti } from '../nodes/NkscIvanti/NkscIvanti.node';
@@ -125,4 +125,44 @@ test('registers the icon build task and points it at node and credential assets'
 		moduleBuiltin._load = originalLoad;
 		delete require.cache[require.resolve('../gulpfile.js')];
 	}
+});
+
+test('node execute delegates to the operation router', async () => {
+	const httpRequest = vi.fn().mockResolvedValue({
+		statusCode: 200,
+		body: { value: [] },
+	});
+	const parameters = {
+		operation: 'search',
+		reportForm: 'initialWarning',
+		externalTicketId: 'EXT-1',
+	};
+	const context = {
+		getInputData: () => [{ json: {} }],
+		getNodeParameter(name: string, _itemIndex?: number, fallbackValue?: unknown) {
+			return Object.hasOwn(parameters, name)
+				? parameters[name as keyof typeof parameters]
+				: fallbackValue;
+		},
+		getCredentials: vi.fn().mockResolvedValue({
+			tenant: 'https://ivanti.example.local/HEAT/api',
+			apiKey: 'secret',
+		}),
+		getNode: () => ({ name: 'NKSC Ivanti' }),
+		continueOnFail: () => false,
+		helpers: {
+			httpRequestWithAuthentication: httpRequest,
+			returnJsonArray(records: unknown[]) {
+				return records.map((json) => ({ json }));
+			},
+			constructExecutionMetaData(items: unknown) {
+				return items;
+			},
+		},
+	};
+
+	const result = await new NkscIvanti().execute.call(context as any);
+
+	assert.deepEqual(result, [[]]);
+	assert.equal(httpRequest.mock.calls[0][1].method, 'GET');
 });

@@ -18,8 +18,8 @@ It handles:
 | Operation | What it does | Input |
 | --- | --- | --- |
 | `Insert NKSC Report` | Creates a new report in Ivanti | Select a report form and fill in the fields |
-| `Update NKSC Report` | Updates an existing Ivanti record | `Record ID`, optional required-field validation |
-| `Search NKSC Report` | Searches reports by external ticket ID | `External Ticket ID` |
+| `Update NKSC Report` | Updates an existing Ivanti record | `Record ID`, update mode, fields to update |
+| `Search NKSC Report` | Searches reports by external ticket ID | `External Ticket ID`, optional `Search Limit` |
 
 ## Report Forms
 
@@ -68,13 +68,29 @@ The required-by-default fields in the node match the audited NKSC HTML forms. Th
 - scope and loss options are boolean flags
 - expandable scope and loss groups can be shown either as one compact selector or as separate boolean switches
 
+### Expression inputs
+
+Most fields can be driven by expressions using the same value shape shown in the editor: strings for text fields, `Taip` / `Ne` for yes-no fields, booleans for switches, and date-time values for date fields.
+
+Some selector fields accept extra expression formats to make generated workflows easier to maintain:
+
+- `Fields To Update` in `Selected Fields` update mode accepts field names, full numbered labels, one-based numbers, comma-separated numbers, or a numeric array. For example, `Summary`, `7`, `1,2,3`, and `[1,2,3]` are valid expression results.
+- `Threat` and `Threat Category` accept the Ivanti value, the numbered English label, the unnumbered English label, or the option number. For example, `2`, `2. Malware`, and `Malware` all resolve to the same threat option.
+- Compact `Scope Options` and `Loss Options` selectors expect arrays of option field names, such as `["ScopeOption2"]`. For expression-heavy workflows, turn on the matching `Expand ... Options` toggle and drive the separate boolean fields instead.
+
 ### Conditional fields
 
 Some fields remain visible in the editor even when their values are only required under certain conditions. That keeps them available for expression-driven workflows while preserving backend validation rules.
 
+### Update behavior
+
+`Update NKSC Report` defaults to `Selected Fields` mode. In this mode, the node only sends the fields selected in `Fields To Update`; the selector labels are numbered so expressions can pass values like `1,2,3` or `[1,2,3]`.
+
+`Full Form` mode sends the selected form payload and can optionally validate required fields before patching the Ivanti record.
+
 ### Search behavior
 
-Search uses the selected report form to choose the Ivanti business object, then filters by external ticket ID. If Ivanti returns multiple matching records, the node returns them all.
+Search uses the selected report form to choose the Ivanti business object, then filters by external ticket ID and returns up to the configured limit, defaulting to 10 records.
 
 ## Credential Setup
 

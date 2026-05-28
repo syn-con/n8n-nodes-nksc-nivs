@@ -7,12 +7,14 @@ import {
 	normalizeThreatValue,
 } from './reportOptions';
 
-export type PayloadValue = string | boolean | number | string[] | null | undefined;
+export type PayloadValue = string | boolean | number | string[] | Date | null | undefined;
 
 export type PayloadInput = Record<string, PayloadValue>;
 
 export type PayloadBuildOptions = {
 	now?: Date;
+	includedFields?: readonly string[];
+	includeFixedFields?: boolean;
 };
 
 export type PayloadValidationResult = {
@@ -30,7 +32,8 @@ type RequiredField = {
 	message?: string;
 };
 
-const ivantiDateTimeOffsetHours = 3;
+const lithuanianTimeZone = 'Europe/Vilnius';
+const dateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss";
 
 export function buildReportPayload(
 	form: ReportForm,
@@ -38,23 +41,13 @@ export function buildReportPayload(
 	validateRequiredFields: boolean,
 	options: PayloadBuildOptions = {},
 ): IDataObject {
-	const resolvedInput: PayloadInput = { ...input };
-	for (const field of form.fields) {
-		if (resolvedInput[field.name] === undefined && field.default !== undefined) {
-			resolvedInput[field.name] = field.default as PayloadValue;
-		}
-	}
-
-	const payload: IDataObject = {
-		...form.fixedFields,
-	};
+	const includedFields =
+		options.includedFields === undefined ? undefined : new Set(options.includedFields);
+	const resolvedInput = resolvePayloadInput(form, input, includedFields);
+	const payload: IDataObject = options.includeFixedFields === false ? {} : { ...form.fixedFields };
 
 	for (const field of form.fields) {
-		if (field.omitFromPayload === true) {
-			continue;
-		}
-
-		if (!isFieldApplicable(field, resolvedInput)) {
+		if (!shouldSerializeField(field, includedFields, resolvedInput)) {
 			continue;
 		}
 
@@ -81,6 +74,57 @@ export function buildReportPayload(
 	}
 
 	return payload;
+}
+
+function resolvePayloadInput(
+	form: ReportForm,
+	input: PayloadInput,
+	includedFields: Set<string> | undefined,
+): PayloadInput {
+	const resolvedInput: PayloadInput = { ...input };
+
+	for (const field of form.fields) {
+		if (shouldApplyFieldDefault(field, includedFields, resolvedInput)) {
+			resolvedInput[field.name] = field.default as PayloadValue;
+		}
+	}
+
+	return resolvedInput;
+}
+
+function shouldApplyFieldDefault(
+	field: ReportField,
+	includedFields: Set<string> | undefined,
+	input: PayloadInput,
+): boolean {
+	return (
+		shouldIncludeFieldInPayload(field, includedFields) &&
+		input[field.name] === undefined &&
+		field.default !== undefined
+	);
+}
+
+function shouldSerializeField(
+	field: ReportField,
+	includedFields: Set<string> | undefined,
+	input: PayloadInput,
+): boolean {
+	return (
+		shouldIncludeFieldInPayload(field, includedFields) &&
+		field.omitFromPayload !== true &&
+		isFieldApplicable(field, input)
+	);
+}
+
+function shouldIncludeFieldInPayload(
+	field: ReportField,
+	includedFields: Set<string> | undefined,
+): boolean {
+	return (
+		includedFields === undefined ||
+		includedFields.has(field.name) ||
+		includedFields.has(getPayloadName(field))
+	);
 }
 
 export function validateReportPayload(
@@ -248,28 +292,26 @@ function formatDateTime(
 	}
 
 	try {
-		const exactDateTime = formatExactDateTime(value);
-		const parsedDateTime = tryToParseDateTime(exactDateTime.value, 'UTC').toUTC();
-		const now = tryToParseDateTime(options.now ?? new Date(), 'UTC').toUTC();
-
-		if (
-			!exactDateTime.hasExplicitTimeZone &&
-			parsedDateTime.toFormat("yyyy-MM-dd'T'HH:mm:ss") !== exactDateTime.value
-		) {
+		const localWallClockValue = getLithuanianLocalWallClockValue(value);
+		// Ivanti stores the submitted timestamp as if it were local time and adds its own offset.
+		// Interpret exact string inputs as Lithuania local wall-clock time, stripping any supplied timezone,
+		// then subtract the real Lithuania offset (2h or 3h depending on DST) before sending.
+		const localDateTime = tryToParseDateTime(localWallClockValue, lithuanianTimeZone);
+		if (localDateTime.toFormat(dateTimeFormat) !== localWallClockValue) {
 			throw new Error(`${field.displayName} must be a valid date/time`);
 		}
 
+		const parsedDateTime = localDateTime.toUTC();
+		const now = tryToParseDateTime(options.now ?? new Date(), 'UTC').toUTC();
+
 		if (parsedDateTime.toMillis() > now.toMillis()) {
+			const latestAcceptedLocalTime = now.setZone(lithuanianTimeZone).toFormat(dateTimeFormat);
 			throw new Error(
-				`${field.displayName} cannot be in the future. Latest allowed value is ${now.toFormat("yyyy-MM-dd'T'HH:mm:ss")}`,
+				`${field.displayName} cannot be in the future. Latest allowed value is ${latestAcceptedLocalTime}`,
 			);
 		}
 
-		const shiftedDateTime = exactDateTime.hasExplicitTimeZone
-			? parsedDateTime
-			: parsedDateTime.minus({ hours: ivantiDateTimeOffsetHours });
-
-		return shiftedDateTime.toFormat("yyyy-MM-dd'T'HH:mm:ss");
+		return parsedDateTime.toFormat(dateTimeFormat);
 	} catch (error) {
 		if (error instanceof Error && error.message.includes('cannot be in the future')) {
 			throw error;
@@ -279,26 +321,18 @@ function formatDateTime(
 	}
 }
 
-function formatExactDateTime(value: PayloadValue): {
-	value: string | Date;
-	hasExplicitTimeZone: boolean;
-} {
+function getLithuanianLocalWallClockValue(value: PayloadValue): string {
 	if (typeof value === 'string') {
-		const exactDateTime = getExactDateTimeFromString(value);
+		const exactDateTime = getLocalWallClockFromString(value);
 		if (exactDateTime !== undefined) {
 			return exactDateTime;
 		}
 	}
 
-	return {
-		value: tryToParseDateTime(value, 'UTC').toUTC().toFormat("yyyy-MM-dd'T'HH:mm:ss"),
-		hasExplicitTimeZone: false,
-	};
+	return tryToParseDateTime(value, 'UTC').toUTC().setZone(lithuanianTimeZone).toFormat(dateTimeFormat);
 }
 
-function getExactDateTimeFromString(
-	value: string,
-): { value: string; hasExplicitTimeZone: boolean } | undefined {
+function getLocalWallClockFromString(value: string): string | undefined {
 	const match = value
 		.trim()
 		.match(
@@ -308,13 +342,9 @@ function getExactDateTimeFromString(
 		return undefined;
 	}
 
-	const [, year, month, day, hour = '00', minute = '00', second = '00', offset] = match;
-	const wallClockValue = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+	const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
 
-	return {
-		value: offset === undefined ? wallClockValue : `${wallClockValue}${offset}`,
-		hasExplicitTimeZone: offset !== undefined,
-	};
+	return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 }
 
 function isEmptyValue(value: PayloadValue): boolean {
