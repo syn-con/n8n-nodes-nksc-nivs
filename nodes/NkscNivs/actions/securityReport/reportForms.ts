@@ -36,41 +36,37 @@ export function getReportForm(formId: string): ReportForm {
 }
 
 export function getReportFieldProperties(): INodeProperties[] {
-	const propertiesByKey = new Map<string, INodeProperties>();
+	// First pass: collect every form that uses each merged field (fields sharing a merge key have
+	// identical name/required/visibleWhen). Second pass builds one property per key with the full
+	// reportForm list, so there is no read-back-and-mutate step.
+	const fieldByKey = new Map<string, ReportField>();
+	const formIdsByKey = new Map<string, ReportFormId[]>();
+	const orderedKeys: string[] = [];
 
 	for (const form of Object.values(reportForms)) {
 		for (const formField of form.fields) {
 			const propertyKey = getPropertyMergeKey(formField);
-			const existing = propertiesByKey.get(propertyKey);
-			if (existing) {
-				const show = existing.displayOptions?.show ?? {};
-				const reportFormsForProperty = new Set([
-					...((show.reportForm as string[] | undefined) ?? []),
-					form.id,
-				]);
-				existing.displayOptions = {
-					show: {
-						...show,
-						reportForm: [...reportFormsForProperty],
-					},
-				};
+			const formIds = formIdsByKey.get(propertyKey);
+			if (formIds) {
+				formIds.push(form.id);
 				continue;
 			}
 
-			const show = {
-				reportForm: [form.id],
-				...(formField.alwaysVisible === true ? {} : (formField.visibleWhen ?? {})),
-			};
-
-			const property = createReportFieldProperty(formField, {
-				show,
-			});
-
-			propertiesByKey.set(propertyKey, property);
+			fieldByKey.set(propertyKey, formField);
+			formIdsByKey.set(propertyKey, [form.id]);
+			orderedKeys.push(propertyKey);
 		}
 	}
 
-	return [...propertiesByKey.values()];
+	return orderedKeys.map((propertyKey) => {
+		const formField = fieldByKey.get(propertyKey) as ReportField;
+		const show = {
+			reportForm: formIdsByKey.get(propertyKey) as ReportFormId[],
+			...(formField.alwaysVisible === true ? {} : (formField.visibleWhen ?? {})),
+		};
+
+		return createReportFieldProperty(formField, { show });
+	});
 }
 
 function createReportFieldProperty(

@@ -1,11 +1,11 @@
 {
   "name": "@syn-con/n8n-nodes-nksc-ivanti",
   "version": "0.1.4",
-  "description": "n8n node for registering NKSC cyber incident reports in Ivanti",
+  "description": "n8n node for registering NKSC cyber incident reports in NKSC NIVS",
   "keywords": [
     "n8n-community-node-package",
     "nksc",
-    "ivanti"
+    "nivs"
   ],
   "author": {
     "name": "UAB Synergy",
@@ -27,7 +27,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "npx rimraf dist && tsc && gulp build:icons",
-    "dev": "gulp build:icons && tsc --watch",
+    "dev": "n8n-node dev",
     "format": "prettier nodes credentials tests --write",
     "lint": "eslint nodes credentials index.ts --ext .ts --max-warnings=0",
     "lint:fix": "eslint nodes credentials index.ts --ext .ts --fix --max-warnings=0",
@@ -44,10 +44,10 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/NkscIvantiApi.credentials.js"
+      "dist/credentials/NkscNivsApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/NkscIvanti/NkscIvanti.node.js"
+      "dist/nodes/NkscNivs/NkscNivs.node.js"
     ]
   },
   "devDependencies": {

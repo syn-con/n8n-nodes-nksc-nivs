@@ -109,11 +109,19 @@ function shouldSerializeField(
 	includedFields: Set<string> | undefined,
 	input: PayloadInput,
 ): boolean {
-	return (
-		shouldIncludeFieldInPayload(field, includedFields) &&
-		field.omitFromPayload !== true &&
-		isFieldApplicable(field, input)
-	);
+	if (!shouldIncludeFieldInPayload(field, includedFields) || field.omitFromPayload === true) {
+		return false;
+	}
+
+	// Selected-fields update mode is the only caller that passes includedFields, and every
+	// field reaching here was explicitly chosen by the user. Its visibleWhen UI gate (e.g. an
+	// expand toggle) must not silently drop it, so applicability only gates the insert and
+	// full-form paths where includedFields is undefined.
+	if (includedFields !== undefined) {
+		return true;
+	}
+
+	return isFieldApplicable(field, input);
 }
 
 function shouldIncludeFieldInPayload(
@@ -178,32 +186,29 @@ function getExpandedRequiredFields(
 		addOneOfRequirement(oneOf, form.requiredOneOf.fields, form.requiredOneOf.message);
 	}
 
-	let changed = true;
-	while (changed) {
-		changed = false;
+	// A single pass suffices: rule activation reads only the static payload, which validation never
+	// mutates. A rule therefore cannot be enabled by another rule's requirement, so there is no
+	// fixpoint to converge to. Chained conditionals still resolve because every controller value
+	// comes from the user's payload (see the "resolves chained conditional requirements in a single
+	// pass" test), and an empty controller correctly leaves its rule inactive.
+	for (const rule of form.conditionalRequired ?? []) {
+		if (payload[rule.when] !== rule.is) {
+			continue;
+		}
 
-		for (const rule of form.conditionalRequired ?? []) {
-			if (payload[rule.when] !== rule.is) {
-				continue;
-			}
+		for (const fieldName of rule.require) {
+			fields.set(fieldName, {
+				name: fieldName,
+				message: `${getFieldDisplayName(form, fieldName)} is required when ${getFieldDisplayName(form, rule.when)} is ${formatConditionValue(rule.is)}`,
+			});
+		}
 
-			for (const fieldName of rule.require) {
-				const previousSize = fields.size;
-				fields.set(fieldName, {
-					name: fieldName,
-					message: `${getFieldDisplayName(form, fieldName)} is required when ${getFieldDisplayName(form, rule.when)} is ${formatConditionValue(rule.is)}`,
-				});
-				changed ||= fields.size !== previousSize;
-			}
-
-			if (rule.requireOneOf) {
-				changed ||=
-					addOneOfRequirement(
-						oneOf,
-						rule.requireOneOf,
-						rule.message ?? `At least one of ${rule.requireOneOf.join(', ')} is required`,
-					) !== undefined;
-			}
+		if (rule.requireOneOf) {
+			addOneOfRequirement(
+				oneOf,
+				rule.requireOneOf,
+				rule.message ?? `At least one of ${rule.requireOneOf.join(', ')} is required`,
+			);
 		}
 	}
 
@@ -214,17 +219,14 @@ function addOneOfRequirement(
 	requirements: Map<string, OneOfRequirement>,
 	fields: readonly string[],
 	message: string,
-): OneOfRequirement | undefined {
+): void {
 	const key = `${message}:${fields.join(',')}`;
 
 	if (requirements.has(key)) {
-		return undefined;
+		return;
 	}
 
-	const requirement = { fields, message };
-	requirements.set(key, requirement);
-
-	return requirement;
+	requirements.set(key, { fields, message });
 }
 
 function formatValidationErrors(errors: string[]): string {
@@ -287,20 +289,23 @@ function formatDateTime(
 	value: PayloadValue,
 	options: PayloadBuildOptions,
 ): PayloadValue {
-	if (value === undefined || value === null) {
-		return value;
-	}
-
+	// Callers only reach here for a non-empty dateTime value (isEmptyValue filters ''/null/undefined
+	// in buildReportPayload), so no null/undefined guard is needed.
 	try {
 		const localWallClockValue = getLithuanianLocalWallClockValue(value);
-		// Ivanti stores the submitted timestamp as if it were local time and adds its own offset.
+		// NKSC NIVS stores the submitted timestamp as if it were local time and adds its own offset.
 		// Interpret exact string inputs as Lithuania local wall-clock time, stripping any supplied timezone,
 		// then subtract the real Lithuania offset (2h or 3h depending on DST) before sending.
-		const localDateTime = tryToParseDateTime(localWallClockValue, lithuanianTimeZone);
-		if (localDateTime.toFormat(dateTimeFormat) !== localWallClockValue) {
+
+		// Validate calendar-correctness (e.g. reject 2026-02-30) in a DST-free zone. Doing the
+		// round-trip check in Vilnius would wrongly reject valid wall-clock times inside the DST
+		// spring-forward gap (last Sunday of March, 03:00-03:59), which Luxon normalises forward.
+		const calendarCheck = tryToParseDateTime(localWallClockValue, 'UTC');
+		if (calendarCheck.toFormat(dateTimeFormat) !== localWallClockValue) {
 			throw new Error(`${field.displayName} must be a valid date/time`);
 		}
 
+		const localDateTime = tryToParseDateTime(localWallClockValue, lithuanianTimeZone);
 		const parsedDateTime = localDateTime.toUTC();
 		const now = tryToParseDateTime(options.now ?? new Date(), 'UTC').toUTC();
 
@@ -329,14 +334,19 @@ function getLithuanianLocalWallClockValue(value: PayloadValue): string {
 		}
 	}
 
-	return tryToParseDateTime(value, 'UTC').toUTC().setZone(lithuanianTimeZone).toFormat(dateTimeFormat);
+	return tryToParseDateTime(value, 'UTC')
+		.toUTC()
+		.setZone(lithuanianTimeZone)
+		.toFormat(dateTimeFormat);
 }
 
 function getLocalWallClockFromString(value: string): string | undefined {
+	// Any supplied timezone (Z or a numeric offset) is matched but intentionally not captured:
+	// exact string inputs are treated as Lithuania local wall-clock time and the offset is stripped.
 	const match = value
 		.trim()
 		.match(
-			/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:\s*(Z|[+-]\d{2}:?\d{2}))?$/,
+			/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:\s*(?:Z|[+-]\d{2}:?\d{2}))?$/,
 		);
 	if (!match) {
 		return undefined;

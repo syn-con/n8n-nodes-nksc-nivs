@@ -1,12 +1,12 @@
 import { NodeOperationError, type IExecuteFunctions, type INodeExecutionData } from 'n8n-workflow';
 
-import type { NkscIvantiOperation } from './node.type';
+import type { NkscNivsOperation } from './node.type';
 import * as securityReport from './securityReport';
 
 export async function router(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 	let returnData: INodeExecutionData[] = [];
 
-	const operation = this.getNodeParameter('operation', 0) as NkscIvantiOperation;
+	const operation = this.getNodeParameter('operation', 0) as NkscNivsOperation;
 
 	switch (operation) {
 		case 'insert':

@@ -6,15 +6,14 @@ import type {
 	INodeProperties,
 } from 'n8n-workflow';
 
-export class NkscIvantiApi implements ICredentialType {
-	name = 'nkscIvantiApi';
+export class NkscNivsApi implements ICredentialType {
+	name = 'nkscNivsApi';
 
-	icon?: Icon = 'file:nksc-ivanti.svg';
+	icon?: Icon = 'file:nksc-nivs.svg';
 
-	displayName = 'NKSC Ivanti API';
+	displayName = 'NKSC NIVS API';
 
-	documentationUrl =
-		'https://help.ivanti.com/ht/help/en_US/ISM/2022/admin/Content/Configure/API/RestAPI-Introduction.htm';
+	documentationUrl = 'https://github.com/syn-con/n8n-nodes-nksc-ivanti#readme';
 
 	properties: INodeProperties[] = [
 		{
@@ -24,7 +23,7 @@ export class NkscIvantiApi implements ICredentialType {
 			default: 'https://incidentai.nksc.lt/HEAT/api',
 			required: true,
 			description:
-				'Full Ivanti API endpoint URL. Include /HEAT/api when your instance requires it.',
+				'Full NKSC NIVS API endpoint URL. Include /HEAT/api when your instance requires it. Use HTTPS in production: with an http:// endpoint the API key is sent unencrypted, so only use http:// on trusted internal networks.',
 		},
 		{
 			displayName: 'API Key',
@@ -49,6 +48,7 @@ export class NkscIvantiApi implements ICredentialType {
 
 	test: ICredentialTestRequest = {
 		request: {
+			// Mirrors buildApiBaseUrl in nodes/NkscNivs/transports/index.ts — keep the two in sync.
 			baseURL:
 				'={{ ($credentials.tenant.match(/^https?:\\/\\//i) ? $credentials.tenant : "https://" + $credentials.tenant).replace(/\\/+$/, "") + "/odata/businessobject" }}',
 			method: 'GET',

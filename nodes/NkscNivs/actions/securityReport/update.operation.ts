@@ -3,18 +3,19 @@ import {
 	INodeExecutionData,
 	INodeProperties,
 	INodePropertyOptions,
-	NodeApiError,
 	NodeOperationError,
 	updateDisplayOptions,
 } from 'n8n-workflow';
 
-import { nkscIvantiApiRequest } from '../../transports';
+import { nkscNivsApiRequest } from '../../transports';
 import { getReportFieldProperties, reportForms, type ReportForm } from './reportForms';
 import {
+	executeItems,
 	getPayloadInput,
 	getSelectedReportForm,
 	sanitizeResponse,
-} from './insert.operation';
+} from './operationHelpers';
+import { handleOperationError } from './operationError';
 import { buildReportPayload, type PayloadInput } from './payload';
 
 const selectedFieldsUpdateMode = 'selectedFields';
@@ -27,7 +28,7 @@ export const properties: INodeProperties[] = [
 		type: 'string',
 		default: '',
 		required: true,
-		description: 'Ivanti RecId of the report to update',
+		description: 'NKSC NIVS RecId of the report to update',
 	},
 	{
 		displayName: 'Update Mode',
@@ -73,13 +74,7 @@ const displayOptions = {
 export const description = updateDisplayOptions(displayOptions, properties);
 
 export async function execute(this: IExecuteFunctions): Promise<INodeExecutionData[]> {
-	const items = this.getInputData();
-
-	const itemResults = await Promise.all(
-		items.map(async (_item, itemIndex) => executeItem.call(this, itemIndex)),
-	);
-
-	return itemResults.flat();
+	return executeItems(this, (itemIndex) => executeItem.call(this, itemIndex));
 }
 
 async function executeItem(
@@ -87,7 +82,7 @@ async function executeItem(
 	itemIndex: number,
 ): Promise<INodeExecutionData[]> {
 	try {
-		const form = getSelectedReportForm.call(this, itemIndex);
+		const form = getSelectedReportForm(this, itemIndex);
 
 		const recordId = this.getNodeParameter('recordId', itemIndex);
 		if (typeof recordId !== 'string' || recordId.trim() === '') {
@@ -101,29 +96,20 @@ async function executeItem(
 			});
 		}
 
-		const payloadInput = getPayloadInput.call(this, itemIndex, form);
+		const payloadInput = getPayloadInput(this, itemIndex, form);
 		const body = buildUpdatePayload.call(this, form, payloadInput, itemIndex);
-		const response = await nkscIvantiApiRequest.call(this, {
+		const response = await nkscNivsApiRequest.call(this, {
 			method: 'PATCH',
 			endpoint: `/odata/businessobject/${form.objectName}('${trimmedRecordId}')`,
 			body,
 		});
 		const responseData = sanitizeResponse(response);
 
-		return this.helpers.constructExecutionMetaData(
-			this.helpers.returnJsonArray(responseData),
-			{ itemData: { item: itemIndex } },
-		);
+		return this.helpers.constructExecutionMetaData(this.helpers.returnJsonArray(responseData), {
+			itemData: { item: itemIndex },
+		});
 	} catch (error) {
-		if (this.continueOnFail()) {
-			return [{ json: { error: getErrorMessage(error) }, pairedItem: { item: itemIndex } }];
-		}
-
-		if (error instanceof NodeOperationError || error instanceof NodeApiError) {
-			throw error;
-		}
-
-		throw new NodeOperationError(this.getNode(), error as Error, { itemIndex });
+		return handleOperationError(this, error, itemIndex);
 	}
 }
 
@@ -157,9 +143,13 @@ function buildUpdatePayload(
 	const rawFieldsToUpdate = this.getNodeParameter('fieldsToUpdate', itemIndex, []);
 	const fieldsToUpdate = normalizeFieldsToUpdate(form, rawFieldsToUpdate);
 	if (fieldsToUpdate.length === 0) {
-		throw new NodeOperationError(this.getNode(), 'Fields To Update must include at least one field', {
-			itemIndex,
-		});
+		throw new NodeOperationError(
+			this.getNode(),
+			'Fields To Update must include at least one field',
+			{
+				itemIndex,
+			},
+		);
 	}
 
 	const body = buildReportPayload(form, payloadInput, false, {
@@ -283,14 +273,13 @@ function getNumberFromToken(token: string | number): number | undefined {
 		return Number.isInteger(token) && token > 0 ? token : undefined;
 	}
 
-	const numberMatch = token.trim().match(/^(\d+)(?:\.\s*.*)?$/);
+	// Only a bare number (with an optional trailing dot) resolves positionally. A labelled token
+	// like "3. Summary" falls through to label matching, which validates the label against the
+	// numbered position instead of silently trusting the number when the two disagree.
+	const numberMatch = token.trim().match(/^(\d+)\s*\.?\s*$/);
 	if (!numberMatch) {
 		return undefined;
 	}
 
 	return Number(numberMatch[1]);
-}
-
-function getErrorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

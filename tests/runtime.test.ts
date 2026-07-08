@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { test, vi } from 'vitest';
 
-import { NkscIvantiApi } from '../credentials/NkscIvantiApi.credentials';
-import { NkscIvanti } from '../nodes/NkscIvanti/NkscIvanti.node';
-import { nkscIvantiOperations } from '../nodes/NkscIvanti/actions/node.type';
+import { NkscNivsApi } from '../credentials/NkscNivsApi.credentials';
+import { NkscNivs } from '../nodes/NkscNivs/NkscNivs.node';
+import { nkscNivsOperations } from '../nodes/NkscNivs/actions/node.type';
 import {
 	reportFieldTypes,
 	reportFormIds,
-} from '../nodes/NkscIvanti/actions/securityReport/reportTypes';
+} from '../nodes/NkscNivs/actions/securityReport/reportTypes';
 
 const require = createRequire(import.meta.url);
 
@@ -32,15 +32,15 @@ test('exports the expected prettier config', () => {
 test('re-exports the node and credential classes from the package entrypoint', async () => {
 	const entrypoint = await import('../index');
 
-	assert.equal(entrypoint.NkscIvanti, NkscIvanti);
-	assert.equal(entrypoint.NkscIvantiApi, NkscIvantiApi);
+	assert.equal(entrypoint.NkscNivs, NkscNivs);
+	assert.equal(entrypoint.NkscNivsApi, NkscNivsApi);
 });
 
 test('describes the API credential as a full endpoint-based setup', () => {
-	const credential = new NkscIvantiApi();
+	const credential = new NkscNivsApi();
 
-	assert.equal(credential.name, 'nkscIvantiApi');
-	assert.equal(credential.displayName, 'NKSC Ivanti API');
+	assert.equal(credential.name, 'nkscNivsApi');
+	assert.equal(credential.displayName, 'NKSC NIVS API');
 	assert.deepEqual(
 		credential.properties.map((property) => property.name),
 		['tenant', 'apiKey'],
@@ -54,7 +54,7 @@ test('describes the API credential as a full endpoint-based setup', () => {
 });
 
 test('exposes the runtime constants used by type-only modules', () => {
-	assert.deepEqual([...nkscIvantiOperations], ['insert', 'update', 'search']);
+	assert.deepEqual([...nkscNivsOperations], ['insert', 'update', 'search']);
 	assert.deepEqual(
 		[...reportFormIds],
 		['initialWarning', 'majorIncident', 'minorIncident', 'nearMissIncident'],
@@ -145,10 +145,10 @@ test('node execute delegates to the operation router', async () => {
 				: fallbackValue;
 		},
 		getCredentials: vi.fn().mockResolvedValue({
-			tenant: 'https://ivanti.example.local/HEAT/api',
+			tenant: 'https://nivs.example.local/HEAT/api',
 			apiKey: 'secret',
 		}),
-		getNode: () => ({ name: 'NKSC Ivanti' }),
+		getNode: () => ({ name: 'NKSC NIVS' }),
 		continueOnFail: () => false,
 		helpers: {
 			httpRequestWithAuthentication: httpRequest,
@@ -161,7 +161,7 @@ test('node execute delegates to the operation router', async () => {
 		},
 	};
 
-	const result = await new NkscIvanti().execute.call(context as any);
+	const result = await new NkscNivs().execute.call(context as any);
 
 	assert.deepEqual(result, [[]]);
 	assert.equal(httpRequest.mock.calls[0][1].method, 'GET');

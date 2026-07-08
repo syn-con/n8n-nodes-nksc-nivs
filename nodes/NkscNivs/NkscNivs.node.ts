@@ -1,6 +1,7 @@
 import {
 	IExecuteFunctions,
 	INodeExecutionData,
+	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
 	NodeConnectionTypes,
@@ -15,24 +16,38 @@ import {
 	reportFormOptions,
 } from './actions/securityReport/reportForms';
 
-export class NkscIvanti implements INodeType {
+// Subtitle shows the selected operation's label so the node name on the canvas changes with the
+// operation. Built from the operation options so the labels have a single source of truth.
+function buildOperationSubtitle(): string {
+	const options = securityReport.operationProperty.options as INodePropertyOptions[];
+	const branches = options
+		.map(
+			(option) =>
+				`$parameter["operation"] === ${JSON.stringify(option.value)} ? ${JSON.stringify(option.name)} : `,
+		)
+		.join('');
+
+	return `={{ ${branches}$parameter["operation"] }}`;
+}
+
+export class NkscNivs implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'NKSC Ivanti',
-		name: 'nkscIvanti',
+		displayName: 'NKSC NIVS',
+		name: 'nkscNivs',
 		group: ['transform'],
-		icon: 'file:nksc-ivanti.svg',
+		icon: 'file:nksc-nivs.svg',
 		version: 1,
-		subtitle: '={{ $parameter["operation"] }}',
-		description: 'Register NKSC cyber incident reports in Ivanti',
+		subtitle: buildOperationSubtitle(),
+		description: 'Register NKSC cyber incident reports in NKSC NIVS',
 		defaults: {
-			name: 'NKSC Ivanti',
+			name: 'NKSC NIVS',
 		},
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		usableAsTool: true,
 		credentials: [
 			{
-				name: 'nkscIvantiApi',
+				name: 'nkscNivsApi',
 				required: true,
 			},
 		],

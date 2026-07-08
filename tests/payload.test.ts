@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import type { INodePropertyOptions } from 'n8n-workflow';
 
@@ -9,27 +9,29 @@ import {
 	noValue,
 	reportForms,
 	reportFormOptions,
+	type ReportForm,
 	yesValue,
-} from '../nodes/NkscIvanti/actions/securityReport/reportForms';
+} from '../nodes/NkscNivs/actions/securityReport/reportForms';
 import {
 	getThreatCategoryOptions,
 	isThreatCategoryForThreat,
 	normalizeThreatCategoryValue,
 	normalizeThreatValue,
 	threatCategoryGroups,
-} from '../nodes/NkscIvanti/actions/securityReport/reportOptions';
+} from '../nodes/NkscNivs/actions/securityReport/reportOptions';
+import { description as insertDescription } from '../nodes/NkscNivs/actions/securityReport/insert.operation';
+import { getPayloadInput } from '../nodes/NkscNivs/actions/securityReport/operationHelpers';
 import {
-	description as insertDescription,
-	getPayloadInput,
-} from '../nodes/NkscIvanti/actions/securityReport/insert.operation';
-import { buildReportPayload } from '../nodes/NkscIvanti/actions/securityReport/payload';
+	buildReportPayload,
+	validateReportPayload,
+} from '../nodes/NkscNivs/actions/securityReport/payload';
 import {
 	buildExternalTicketFilter,
 	externalTicketIdField,
 	extractODataRecords,
-} from '../nodes/NkscIvanti/actions/securityReport/search.operation';
-import { description as operationDescription } from '../nodes/NkscIvanti/actions/securityReport';
-import { NkscIvanti } from '../nodes/NkscIvanti/NkscIvanti.node';
+} from '../nodes/NkscNivs/actions/securityReport/search.operation';
+import { description as operationDescription } from '../nodes/NkscNivs/actions/securityReport';
+import { NkscNivs } from '../nodes/NkscNivs/NkscNivs.node';
 
 const validMajorIncident = {
 	Organization: 'NKSC test organizacija',
@@ -238,6 +240,24 @@ test('rejects invalid exact date/time field values', () => {
 			),
 		/Detected On must be a valid date\/time/,
 	);
+});
+
+test('accepts wall-clock times inside the Lithuanian DST spring-forward gap', () => {
+	// 2026-03-29 is the last Sunday of March; Vilnius jumps 03:00 -> 04:00, so 03:00-03:59
+	// does not exist locally. Luxon normalises the instant either way, both yielding 01:30 UTC.
+	const payload = buildReportPayload(
+		reportForms.majorIncident,
+		{
+			...validMajorIncident,
+			DetectedOn: '2026-03-29T03:30:00',
+		},
+		true,
+		{
+			now: new Date('2026-06-01T00:00:00Z'),
+		},
+	);
+
+	assert.equal(payload.DetectedOn, '2026-03-29T01:30:00');
 });
 
 test('omits external ticket ID when it is empty', () => {
@@ -474,7 +494,7 @@ test('expands scope and loss options behind boolean toggles', () => {
 	assert.equal(scopeToggleProperty?.type, 'boolean');
 });
 
-test('omits expansion toggles from the Ivanti payload', () => {
+test('omits expansion toggles from the NKSC NIVS payload', () => {
 	const payload = buildReportPayload(reportForms.majorIncident, validMajorIncident, true);
 
 	assert.equal(payload.ScopeOptionsExpanded, undefined);
@@ -526,7 +546,7 @@ test('exposes search operation', () => {
 });
 
 test('hides form version for search because versions are local to the node', () => {
-	const formVersionProperty = new NkscIvanti().description.properties.find(
+	const formVersionProperty = new NkscNivs().description.properties.find(
 		(property) => property.name === 'formVersion',
 	);
 
@@ -534,7 +554,7 @@ test('hides form version for search because versions are local to the node', () 
 });
 
 test('shows operation before report selection', () => {
-	const propertyNames = new NkscIvanti().description.properties.map((property) => property.name);
+	const propertyNames = new NkscNivs().description.properties.map((property) => property.name);
 
 	assert.deepEqual(propertyNames.slice(0, 3), ['operation', 'reportForm', 'formVersion']);
 });
@@ -562,6 +582,11 @@ test('extracts a single OData object response without mutating it', () => {
 
 	assert.deepEqual(records, [{ RecId: 'newsrv1' }]);
 	assert.deepEqual(response, { '@odata.context': 'metadata', RecId: 'newsrv1' });
+});
+
+test('returns no records for an empty or absent search response', () => {
+	assert.deepEqual(extractODataRecords({}), []);
+	assert.deepEqual(extractODataRecords(undefined), []);
 });
 
 test('requires one scope option for major incident insert validation', () => {
@@ -616,8 +641,8 @@ test('continues collecting payload input when n8n parameter reads throw for miss
 		},
 	};
 
-	const payloadInput = getPayloadInput.call(
-		context as Parameters<typeof getPayloadInput.call>[0],
+	const payloadInput = getPayloadInput(
+		context as Parameters<typeof getPayloadInput>[0],
 		0,
 		reportForms.majorIncident,
 	);
@@ -676,6 +701,36 @@ test('reports conditional fields only when their controller has the matching val
 			error.message.includes('Cyber Incident Impact is required') &&
 			error.message.includes('Cyber Incident Mitigation is required') &&
 			!error.message.includes('Threat Category is required'),
+	);
+});
+
+test('resolves chained conditional requirements in a single pass', () => {
+	// FinalReportUpdate = No makes Threat required; supplying a category-backed Threat then makes
+	// Threat Category required. Both rules must fire from the same static payload in one pass -
+	// this guards the removal of the old while(changed) fixpoint loop.
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.minorIncident,
+				{
+					...validInitialReporter,
+					Summary: 'Nedidelis incidentas',
+					ImpactToPersonYesNo: noValue,
+					CyberIncidentResolvedYesNo: yesValue,
+					CriminalOffenceYesNo: noValue,
+					AffectedServices: 'Paslaugos',
+					FinancialLossYesNo: noValue,
+					ImpactFromThirdPartyYesNo: noValue,
+					CyberIncidentResolvedHelpYesNo: noValue,
+					CyberIncidentReportedYesNo: noValue,
+					FinalReportUpdateYesNo: noValue,
+					Threat: malwareThreatValue,
+					CyberIncidentImpact: 'Poveikis',
+					CyberIncidentMitigation: 'Priemones',
+				},
+				true,
+			),
+		/Threat Category is required/,
 	);
 });
 
@@ -831,6 +886,7 @@ test('normalizes threat and category expression inputs defensively', () => {
 
 	assert.equal(isThreatCategoryForThreat('Malware', 'Advanced Malware'), true);
 	assert.equal(isThreatCategoryForThreat('Unknown Threat', malwareCategoryValue), false);
+	assert.equal(isThreatCategoryForThreat('Malware', 'Totally Unknown Category'), false);
 });
 
 test('omits the none threat category option from payload', () => {
@@ -1070,4 +1126,115 @@ test('allows max length boundary values', () => {
 	);
 
 	assert.equal(payload.Summary, 'x'.repeat(255));
+});
+
+const syntheticMultiForm = {
+	id: 'nearMissIncident',
+	displayName: 'Synthetic Multi',
+	objectName: 'X',
+	fixedFields: {},
+	fields: [
+		{ displayName: 'Multi', name: 'Multi', type: 'multiOptions', default: [], description: '' },
+	],
+} as unknown as ReportForm;
+
+test('serializes a multi-select field with no option fields as a no-op', () => {
+	const payload = buildReportPayload(syntheticMultiForm, { Multi: ['x', 'y'] }, false);
+
+	assert.deepEqual(payload, {});
+});
+
+test('ignores a multi-select field given a non-array value', () => {
+	const payload = buildReportPayload(syntheticMultiForm, { Multi: 'not-an-array' }, false);
+
+	assert.deepEqual(payload, {});
+});
+
+test('keeps an unrecognized threat category value unchanged', () => {
+	const payload = buildReportPayload(
+		reportForms.minorIncident,
+		{
+			...validInitialReporter,
+			Summary: 'Nedidelis incidentas',
+			ThreatCategory: 'Unrecognized Category',
+		},
+		false,
+	);
+
+	assert.equal(payload.ThreatCategory, 'Unrecognized Category');
+});
+
+test('rejects date/time strings that are not a recognizable date', () => {
+	assert.throws(
+		() =>
+			buildReportPayload(
+				reportForms.majorIncident,
+				{
+					...validMajorIncident,
+					DetectedOn: 'not-a-date',
+				},
+				true,
+			),
+		/Detected On must be a valid date\/time/,
+	);
+});
+
+test('deduplicates identical validation messages', () => {
+	const form = {
+		id: 'nearMissIncident',
+		displayName: 'Synthetic Duplicates',
+		objectName: 'X',
+		fixedFields: {},
+		fields: [
+			{ displayName: 'Same', name: 'S1', type: 'string', required: true, description: '' },
+			{ displayName: 'Same', name: 'S2', type: 'string', required: true, description: '' },
+		],
+	} as unknown as ReportForm;
+
+	const result = validateReportPayload(form, {}, true);
+
+	assert.equal(result.valid, false);
+	assert.deepEqual(result.errors, ['Same is required']);
+});
+
+test('formats conditional messages, unknown controllers, and one-of requirements', () => {
+	const form = {
+		id: 'nearMissIncident',
+		displayName: 'Synthetic Conditionals',
+		objectName: 'X',
+		fixedFields: {},
+		fields: [
+			{
+				displayName: 'Bool Ctrl',
+				name: 'BoolCtrl',
+				type: 'toggle',
+				default: false,
+				description: '',
+			},
+			{ displayName: 'Detail', name: 'Detail', type: 'string', default: '', description: '' },
+			{ displayName: 'Flag', name: 'Flag', type: 'toggle', default: false, description: '' },
+		],
+		requiredOneOf: { fields: ['Flag'], message: 'need flag' },
+		conditionalRequired: [
+			// is:true -> "Yes"; requires an unknown field; requireOneOf without a message -> default text
+			{ when: 'BoolCtrl', is: true, require: ['Detail', 'GhostField'], requireOneOf: ['Flag'] },
+			// is:false -> "No"; requireOneOf shares the requiredOneOf key -> deduplicated
+			{
+				when: 'BoolCtrl',
+				is: false,
+				require: ['Detail'],
+				requireOneOf: ['Flag'],
+				message: 'need flag',
+			},
+		],
+	} as unknown as ReportForm;
+
+	const yesResult = validateReportPayload(form, { BoolCtrl: true }, true);
+	assert.ok(yesResult.errors.includes('Detail is required when Bool Ctrl is Yes'));
+	assert.ok(yesResult.errors.includes('GhostField is required when Bool Ctrl is Yes'));
+	assert.ok(yesResult.errors.includes('At least one of Flag is required'));
+
+	const noResult = validateReportPayload(form, { BoolCtrl: false }, true);
+	assert.ok(noResult.errors.includes('Detail is required when Bool Ctrl is No'));
+	assert.equal(noResult.errors.filter((message) => message === 'need flag').length, 1);
 });

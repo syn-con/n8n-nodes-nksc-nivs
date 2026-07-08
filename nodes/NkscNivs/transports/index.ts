@@ -11,13 +11,13 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 
-type NkscIvantiApiRequestContext =
+type NkscNivsApiRequestContext =
 	| IExecuteFunctions
 	| IExecuteSingleFunctions
 	| IHookFunctions
 	| ILoadOptionsFunctions;
 
-type NkscIvantiApiRequestOptions = {
+type NkscNivsApiRequestOptions = {
 	method: IHttpRequestMethods;
 	endpoint: string;
 	body?: IDataObject;
@@ -25,9 +25,10 @@ type NkscIvantiApiRequestOptions = {
 	headers?: IDataObject;
 };
 
-type NkscIvantiCredentials = {
+type NkscNivsCredentials = {
+	// The apiKey is consumed by the credential's `authenticate` block (see NkscNivsApi.credentials.ts),
+	// not read here — only the tenant is needed to build the base URL.
 	tenant: string;
-	apiKey: string;
 };
 
 type FullHttpResponse = {
@@ -35,28 +36,26 @@ type FullHttpResponse = {
 	body?: unknown;
 };
 
-export async function nkscIvantiApiRequest(
-	this: NkscIvantiApiRequestContext,
-	requestOptions: NkscIvantiApiRequestOptions,
+export async function nkscNivsApiRequest(
+	this: NkscNivsApiRequestContext,
+	requestOptions: NkscNivsApiRequestOptions,
 ): Promise<unknown> {
-	const credential = (await this.getCredentials('nkscIvantiApi')) as
-		| NkscIvantiCredentials
-		| undefined;
+	const credential = (await this.getCredentials('nkscNivsApi')) as NkscNivsCredentials | undefined;
 
 	if (credential === undefined) {
-		throw new NodeOperationError(this.getNode(), 'No NKSC Ivanti credentials got returned');
+		throw new NodeOperationError(this.getNode(), 'No NKSC NIVS credentials got returned');
 	}
 
 	const baseUrl = buildApiBaseUrl(credential.tenant);
-	const options = buildHttpRequestOptions(baseUrl, credential.apiKey, requestOptions);
+	const options = buildHttpRequestOptions(baseUrl, requestOptions);
 
 	try {
 		const response = (await this.helpers.httpRequestWithAuthentication.call(
 			this,
-			'nkscIvantiApi',
+			'nkscNivsApi',
 			options,
 		)) as FullHttpResponse | undefined;
-		return parseIvantiResponse(this, response);
+		return parseNivsResponse(this, response);
 	} catch (error) {
 		if (error instanceof NodeApiError || error instanceof NodeOperationError) {
 			throw error;
@@ -66,6 +65,8 @@ export async function nkscIvantiApiRequest(
 	}
 }
 
+// Note: NkscNivsApi.credentials.ts's `test.request.baseURL` expression mirrors this normalization
+// (add https:// if no scheme, strip trailing slashes). Keep the two in sync.
 export function buildApiBaseUrl(apiEndpoint: string): string {
 	const normalizedEndpoint = apiEndpoint.trim().replace(/\/+$/, '');
 
@@ -76,14 +77,11 @@ export function buildApiBaseUrl(apiEndpoint: string): string {
 
 function buildHttpRequestOptions(
 	baseUrl: string,
-	apiKey: string,
-	requestOptions: NkscIvantiApiRequestOptions,
+	requestOptions: NkscNivsApiRequestOptions,
 ): IHttpRequestOptions {
+	// The Authorization header is injected by the credential's `authenticate` block
+	// through httpRequestWithAuthentication, so it is intentionally not set here.
 	const options: IHttpRequestOptions = {
-		headers: {
-			Authorization: `rest_api_key=${apiKey}`,
-			...requestOptions.headers,
-		},
 		method: requestOptions.method,
 		body: requestOptions.body,
 		url: `${baseUrl}${requestOptions.endpoint}`,
@@ -92,6 +90,10 @@ function buildHttpRequestOptions(
 		ignoreHttpStatusErrors: true,
 	};
 
+	if (requestOptions.headers !== undefined) {
+		options.headers = requestOptions.headers;
+	}
+
 	if (requestOptions.qs !== undefined) {
 		options.qs = requestOptions.qs;
 	}
@@ -99,8 +101,8 @@ function buildHttpRequestOptions(
 	return options;
 }
 
-function parseIvantiResponse(
-	node: NkscIvantiApiRequestContext,
+function parseNivsResponse(
+	node: NkscNivsApiRequestContext,
 	response: FullHttpResponse | undefined,
 ): unknown {
 	if (response && response.statusCode > 299) {
@@ -111,11 +113,10 @@ function parseIvantiResponse(
 		});
 	}
 
-	if (response && response.statusCode === 204) {
-		return {};
-	}
-
-	return response?.body ?? response;
+	// Any successful response without a JSON body (204, or a 200 with an empty body)
+	// resolves to {} so the full { statusCode, headers, body } envelope is never leaked
+	// into the item output.
+	return response?.body ?? {};
 }
 
 function getErrorResponseBody(body: unknown): JsonObject {

@@ -1,4 +1,4 @@
-import { NkscIvantiApi } from './credentials/NkscIvantiApi.credentials';
-import { NkscIvanti } from './nodes/NkscIvanti/NkscIvanti.node';
+import { NkscNivsApi } from './credentials/NkscNivsApi.credentials';
+import { NkscNivs } from './nodes/NkscNivs/NkscNivs.node';
 
-export { NkscIvanti, NkscIvantiApi };
+export { NkscNivs, NkscNivsApi };
