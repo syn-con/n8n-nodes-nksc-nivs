@@ -13,7 +13,7 @@ export class NkscNivsApi implements ICredentialType {
 
 	displayName = 'NKSC NIVS API';
 
-	documentationUrl = 'https://github.com/syn-con/n8n-nodes-nksc-ivanti#readme';
+	documentationUrl = 'https://github.com/syn-con/n8n-nodes-nksc-nivs#readme';
 
 	properties: INodeProperties[] = [
 		{

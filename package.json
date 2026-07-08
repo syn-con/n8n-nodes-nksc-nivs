@@ -1,5 +1,5 @@
 {
-  "name": "@syn-con/n8n-nodes-nksc-ivanti",
+  "name": "@syn-con/n8n-nodes-nksc-nivs",
   "version": "0.1.5",
   "description": "n8n node for registering NKSC cyber incident reports in NKSC NIVS",
   "keywords": [
@@ -12,13 +12,13 @@
     "email": "info@synergy.lt"
   },
   "license": "MIT",
-  "homepage": "https://github.com/syn-con/n8n-nodes-nksc-ivanti#readme",
+  "homepage": "https://github.com/syn-con/n8n-nodes-nksc-nivs#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/syn-con/n8n-nodes-nksc-ivanti.git"
+    "url": "git+https://github.com/syn-con/n8n-nodes-nksc-nivs.git"
   },
   "bugs": {
-    "url": "https://github.com/syn-con/n8n-nodes-nksc-ivanti/issues"
+    "url": "https://github.com/syn-con/n8n-nodes-nksc-nivs/issues"
   },
   "engines": {
     "node": ">=20.15"
