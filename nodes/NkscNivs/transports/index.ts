@@ -107,9 +107,15 @@ function parseNivsResponse(
 ): unknown {
 	if (response && response.statusCode > 299) {
 		const errorResponse = getErrorResponseBody(response.body);
+		// n8n's NodeApiError reads errorResponse.message directly and calls .toUpperCase() on it while
+		// building the descriptive message. NIVS/Ivanti OData errors carry a non-string `message` (the
+		// localised { lang, value } object), so leaving message extraction to NodeApiError throws
+		// "(message || "").toUpperCase is not a function". Passing an always-string message (and the real
+		// HTTP status code) keeps this.message a string and prevents that crash.
 		throw new NodeApiError(node.getNode(), errorResponse, {
-			description: getStringProperty(errorResponse, 'description'),
-			message: getStringProperty(errorResponse, 'message'),
+			httpCode: response.statusCode.toString(),
+			message: extractErrorMessage(response.body, response.statusCode),
+			description: extractErrorDescription(errorResponse),
 		});
 	}
 
@@ -125,8 +131,68 @@ function getErrorResponseBody(body: unknown): JsonObject {
 		: {};
 }
 
-function getStringProperty(object: JsonObject, key: string): string | undefined {
-	const value = object[key];
+// Keys under which NIVS/Ivanti, OData and ASP.NET Web API responses put the human-readable
+// error string. `value` covers OData's localised message object ({ lang, value }); `error`
+// is traversed to reach the nested OData error object.
+const ERROR_MESSAGE_KEYS = ['message', 'Message', 'value', 'ExceptionMessage', 'error'] as const;
+const ERROR_MESSAGE_MAX_DEPTH = 5;
 
-	return typeof value === 'string' ? value : undefined;
+function extractErrorMessage(body: unknown, statusCode: number): string {
+	return findErrorString(body, 0) ?? `NKSC NIVS request failed with status code ${statusCode}`;
+}
+
+function findErrorString(value: unknown, depth: number): string | undefined {
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		return trimmed === '' ? undefined : trimmed;
+	}
+
+	if (typeof value === 'number') {
+		return String(value);
+	}
+
+	if (depth >= ERROR_MESSAGE_MAX_DEPTH || typeof value !== 'object' || value === null) {
+		return undefined;
+	}
+
+	const record = value as Record<string, unknown>;
+	for (const key of ERROR_MESSAGE_KEYS) {
+		if (key in record) {
+			const found = findErrorString(record[key], depth + 1);
+			if (found !== undefined) {
+				return found;
+			}
+		}
+	}
+
+	return undefined;
+}
+
+function extractErrorDescription(body: JsonObject): string | undefined {
+	return findErrorDescription(body, 0);
+}
+
+function findErrorDescription(value: unknown, depth: number): string | undefined {
+	if (depth >= ERROR_MESSAGE_MAX_DEPTH || typeof value !== 'object' || value === null) {
+		return undefined;
+	}
+
+	const record = value as Record<string, unknown>;
+	for (const key of ['description', 'Description', 'detail', 'details']) {
+		const candidate = record[key];
+		if (typeof candidate === 'string' && candidate.trim() !== '') {
+			return candidate.trim();
+		}
+	}
+
+	for (const key of ['error', 'Error']) {
+		if (key in record) {
+			const found = findErrorDescription(record[key], depth + 1);
+			if (found !== undefined) {
+				return found;
+			}
+		}
+	}
+
+	return undefined;
 }

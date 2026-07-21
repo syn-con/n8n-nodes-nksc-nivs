@@ -164,6 +164,88 @@ test('rejects non-2xx responses with API error content', async () => {
 	);
 });
 
+test('reports a clean message when the error body carries a non-string message object', async () => {
+	// Reproduces the NIVS/Ivanti OData error shape that previously crashed inside n8n's NodeApiError
+	// with "(message || \"\").toUpperCase is not a function": a localised { lang, value } message
+	// object plus a non-numeric code that stops NodeApiError from normalising it away.
+	const context = createTransportContext({
+		credentials: {
+			tenant: 'https://nivs.example.local/HEAT/api',
+			apiKey: 'secret',
+		},
+		response: {
+			statusCode: 400,
+			body: {
+				code: 'ValidationError',
+				message: { lang: 'en-US', value: 'Invalid external ticket RecId' },
+			},
+		},
+	});
+
+	await assert.rejects(
+		() =>
+			nkscNivsApiRequest.call(context, {
+				method: 'POST',
+				endpoint: '/odata/businessobject/XSC_SecurityReport__NearMissReports',
+				body: { XSC_ExternalTicket_RecId: 'FILE' },
+			}),
+		(error) =>
+			error instanceof Error &&
+			error.message.includes('Invalid external ticket RecId') &&
+			!error.message.includes('toUpperCase'),
+	);
+});
+
+test('extracts a message nested under the OData error object', async () => {
+	const context = createTransportContext({
+		credentials: {
+			tenant: 'https://nivs.example.local/HEAT/api',
+			apiKey: 'secret',
+		},
+		response: {
+			statusCode: 500,
+			body: {
+				error: {
+					code: 'InternalError',
+					message: { lang: 'en-US', value: 'Something went wrong' },
+				},
+			},
+		},
+	});
+
+	await assert.rejects(
+		() =>
+			nkscNivsApiRequest.call(context, {
+				method: 'POST',
+				endpoint: '/odata/businessobject/XSC_SecurityReport__NearMissReports',
+				body: { Summary: 'x' },
+			}),
+		(error) => error instanceof Error && error.message.includes('Something went wrong'),
+	);
+});
+
+test('falls back to a status-code message when the error body has no readable message', async () => {
+	const context = createTransportContext({
+		credentials: {
+			tenant: 'https://nivs.example.local/HEAT/api',
+			apiKey: 'secret',
+		},
+		response: {
+			statusCode: 403,
+			body: { unexpected: { shape: true } },
+		},
+	});
+
+	await assert.rejects(
+		() =>
+			nkscNivsApiRequest.call(context, {
+				method: 'GET',
+				endpoint: '/odata/businessobject/XSC_SecurityReport__NearMissReports',
+			}),
+		(error) => error instanceof Error && error.message.includes('403'),
+	);
+});
+
 test('forwards custom request headers to the HTTP helper', async () => {
 	const context = createTransportContext({
 		credentials: {
