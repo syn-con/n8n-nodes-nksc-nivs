@@ -24,7 +24,7 @@ export const threatCategoryField = field({
 	type: 'options',
 	default: '',
 	maxLength: 1000,
-	description: 'Kibernetines gresmes pogrupis',
+	description: 'Cyber threat subcategory',
 	options: getThreatCategoryOptions(),
 });
 
@@ -80,7 +80,7 @@ export const baseFields = {
 		default: '',
 		required: true,
 		maxLength: 255,
-		description: 'Pranesejo organizacija',
+		description: 'Organization reporting the incident',
 	}),
 	reporter: field({
 		displayName: 'Reporter',
@@ -89,7 +89,7 @@ export const baseFields = {
 		default: '',
 		required: true,
 		maxLength: 255,
-		description: 'Pranesejo vardas ir pavarde',
+		description: 'Full name of the person reporting the incident',
 	}),
 	reporterEmail: field({
 		displayName: 'Reporter Email',
@@ -98,7 +98,7 @@ export const baseFields = {
 		default: '',
 		required: true,
 		maxLength: 255,
-		description: 'Pranesejo el. pastas.',
+		description: 'Email address of the person reporting the incident',
 	}),
 	reporterPhone: field({
 		displayName: 'Reporter Phone',
@@ -107,7 +107,7 @@ export const baseFields = {
 		default: '',
 		required: true,
 		maxLength: 100,
-		description: 'Pranesejo telefono numeris',
+		description: 'Phone number of the person reporting the incident',
 	}),
 	reporterTitle: field({
 		displayName: 'Reporter Title',
@@ -116,7 +116,7 @@ export const baseFields = {
 		default: '',
 		required: true,
 		maxLength: 255,
-		description: 'Pranesejo pareigos',
+		description: 'Job title of the person reporting the incident',
 	}),
 	externalTicketId: field({
 		displayName: 'External Ticket ID',
@@ -133,14 +133,14 @@ export const baseFields = {
 		default: '',
 		required: true,
 		maxLength: 255,
-		description: 'Pavadinimas',
+		description: 'Title of the report',
 	}),
 	detectedOn: field({
 		displayName: 'Detected On',
 		name: 'DetectedOn',
 		type: 'dateTime',
 		default: '',
-		description: 'Data ir laikas, kada kibernetinis incidentas ivyko ar buvo nustatytas',
+		description: 'Date and time the cyber incident occurred or was detected',
 	}),
 	affectedEntities: field({
 		displayName: 'Affected Entities',
@@ -148,7 +148,8 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Vieta, iranga ar informacine sistema, kur incidentas ivyko ar buvo nustatytas',
+		description:
+			'Location, equipment or information system where the incident occurred or was detected',
 	}),
 	criminalOffence: field({
 		displayName: 'Criminal Offence',
@@ -156,7 +157,8 @@ export const baseFields = {
 		type: 'yesNo',
 		default: noValue,
 		required: true,
-		description: 'Ar incidenta, kaip itariama, sukele neteiseti ar piktavaliski veiksmai?',
+		description:
+			'Whether the incident is suspected to have been caused by illegal or malicious actions',
 	}),
 	evidence: field({
 		displayName: 'Evidence',
@@ -164,14 +166,14 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Turimi neteisetu ar piktavaliskiu veiksmu irodymai, jei tokiu yra',
+		description: 'Available evidence of illegal or malicious actions, if any',
 	}),
 	intergovernmentalImpact: field({
 		displayName: 'Intergovernmental Impact',
 		name: 'IntergovernmentalImpactYesNo',
 		type: 'yesNo',
 		default: noValue,
-		description: 'Ar incidentas galetu daryti tarpvalstybini poveiki?',
+		description: 'Whether the incident could have a cross-border impact',
 	}),
 	intergovernmentalImpactValue: field({
 		displayName: 'Intergovernmental Impact Details',
@@ -179,7 +181,7 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Tarpvalstybinis poveikis',
+		description: 'Cross-border impact',
 	}),
 	helpNeeded: field({
 		displayName: 'Help Needed',
@@ -187,7 +189,7 @@ export const baseFields = {
 		type: 'yesNo',
 		default: noValue,
 		required: true,
-		description: 'Ar reikalinga pagalba suvaldant incidenta?',
+		description: 'Whether assistance is needed to contain the incident',
 	}),
 	helpDetails: field({
 		displayName: 'Help Details',
@@ -195,14 +197,14 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Pagalbos priemones ar veiksmai',
+		description: 'Assistance measures or actions',
 	}),
 	reported: field({
 		displayName: 'Reported To Other Institutions',
 		name: 'CyberIncidentReportedYesNo',
 		type: 'yesNo',
 		default: noValue,
-		description: 'Ar apie incidenta buvo informuotos kitos istaigos?',
+		description: 'Whether other institutions were informed about the incident',
 	}),
 	reportedValue: field({
 		displayName: 'Reported Institutions',
@@ -210,7 +212,7 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Istaigos',
+		description: 'Institutions that were informed',
 	}),
 	otherInformation: field({
 		displayName: 'Other Information',
@@ -218,14 +220,14 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Kita svarbi informacija',
+		description: 'Other relevant information',
 	}),
 	typeOfCyberIncident: field({
 		displayName: 'Type Of Cyber Incident',
 		name: 'TypeOfCyberIncident',
 		type: 'string',
 		default: '',
-		description: 'Kibernetinio incidento tipas',
+		description: 'Severity type assigned to the cyber incident (Major, Minor or Near Miss)',
 	}),
 	impactToPersons: field({
 		displayName: 'Impact To Persons',
@@ -233,7 +235,7 @@ export const baseFields = {
 		type: 'yesNo',
 		default: noValue,
 		required: true,
-		description: 'Ar incidentas paveike arba gali paveikti kitus fizinius ar juridinius asmenis?',
+		description: 'Whether the incident has affected or could affect other natural or legal persons',
 	}),
 	affectedPersons: field({
 		displayName: 'Affected Persons',
@@ -241,7 +243,7 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Paveikti asmenys ir zalos dydis',
+		description: 'Affected persons and the extent of the damage',
 	}),
 	resolved: field({
 		displayName: 'Incident Resolved',
@@ -249,7 +251,7 @@ export const baseFields = {
 		type: 'yesNo',
 		default: noValue,
 		required: true,
-		description: 'Ar kibernetinis incidentas suvaldytas?',
+		description: 'Whether the cyber incident has been contained',
 	}),
 	resolvedValue: field({
 		displayName: 'Incident Resolution Plan',
@@ -257,7 +259,7 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Priemones ar veiksmai, kurie bus atlikti siekiant suvaldyti incidenta',
+		description: 'Measures or actions that will be taken to contain the incident',
 	}),
 	affectedServices: field({
 		displayName: 'Affected Services',
@@ -266,7 +268,7 @@ export const baseFields = {
 		default: '',
 		required: true,
 		rows: 3,
-		description: 'Paveiktos paslaugos ir ju sutrikimu apimtys',
+		description: 'Affected services and the extent of their disruption',
 	}),
 	financialLoss: field({
 		displayName: 'Financial Loss',
@@ -274,7 +276,7 @@ export const baseFields = {
 		type: 'yesNo',
 		default: noValue,
 		required: true,
-		description: 'Ar patirti ar gali buti patirti finansiniai nuostoliai?',
+		description: 'Whether financial losses have been or could be incurred',
 	}),
 	financialLossValue: field({
 		displayName: 'Financial Loss Details',
@@ -283,7 +285,7 @@ export const baseFields = {
 		default: '',
 		maxLength: 1000,
 		rows: 3,
-		description: 'Nuostoliu dydis',
+		description: 'Amount of the losses',
 	}),
 	thirdPartyImpact: field({
 		displayName: 'Third-Party Impact',
@@ -291,7 +293,7 @@ export const baseFields = {
 		type: 'yesNo',
 		default: noValue,
 		required: true,
-		description: 'Ar incidenta sukele treciosios salys?',
+		description: 'Whether the incident was caused by third parties',
 	}),
 	thirdPartyValue: field({
 		displayName: 'Third-Party Details',
@@ -299,13 +301,13 @@ export const baseFields = {
 		type: 'string',
 		default: '',
 		rows: 3,
-		description: 'Treciosios salys',
+		description: 'Third parties involved',
 	}),
 	recurrence: field({
 		displayName: 'Incident Recurrence',
 		name: 'CyberIncidentRecurrenceYesNo',
 		type: 'yesNo',
 		default: noValue,
-		description: 'Ar kibernetinis incidentas pasikartoja?',
+		description: 'Whether the cyber incident is recurring',
 	}),
 };

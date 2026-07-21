@@ -30,43 +30,44 @@ export const scopeOptions: INodePropertyOptions[] = [
 		name: '(Option 1) Services Disrupted Across Lithuania/EU/NATO',
 		value: 'ScopeOption1',
 		description:
-			'Paslaugos trikdomos visoje Lietuvos teritorijoje ir (ar) bent vienoje ES arba NATO salyje',
+			'Services are disrupted across the entire territory of Lithuania and/or in at least one EU or NATO country',
 	},
 	{
 		name: '(Option 2) System Disrupted for 2+ Hours',
 		value: 'ScopeOption2',
-		description: 'Tinklu ir informacines sistemos veikla trikdoma 2 ar daugiau valandu',
+		description: 'Network and information system operation is disrupted for 2 or more hours',
 	},
 	{
 		name: '(Option 3) 1,000 or 25% Users/Workplaces Affected',
 		value: 'ScopeOption3',
 		description:
-			'Paveiktu paslaugu gaveju ar darbo vietu skaicius lygus arba didesnis nei 1 000, arba 25 procentai',
+			'The number of affected service recipients or workplaces is equal to or greater than 1,000, or 25 percent',
 	},
 	{
 		name: '(Option 4) 1,000 or 25% Recipient Data Affected',
 		value: 'ScopeOption4',
-		description: 'Paveikti paslaugu gaveju asmens duomenys ar kiti saugomi duomenys',
+		description: 'Personal data of service recipients or other stored data has been affected',
 	},
 	{
 		name: '(Option 5) Legal Requirements Cannot Be Met',
 		value: 'ScopeOption5',
-		description: 'Subjektas nebegali uztikrinti teises aktuose nustatytu reikalavimu igyvendinimo',
+		description:
+			'The entity can no longer ensure compliance with requirements laid down in legislation',
 	},
 	{
 		name: '(Option 6) Trade Secrets or Classified Information Lost',
 		value: 'ScopeOption6',
-		description: 'Prarastos arba atskleistos komercines paslaptys arba islaptinta informacija',
+		description: 'Trade secrets or classified information have been lost or disclosed',
 	},
 	{
 		name: '(Option 7) Recurring Similar Incident With Major Loss',
 		value: 'ScopeOption7',
-		description: 'Per 6 menesius patiriamas daugiau nei vienas analogiskas incidentas',
+		description: 'More than one analogous incident is experienced within 6 months',
 	},
 	{
 		name: '(Option 11) Major Financial Loss',
 		value: 'ScopeOption11',
-		description: 'Subjektas patiria ar gali patirti dideliu finansiniu nuostoliu',
+		description: 'The entity incurs or may incur major financial losses',
 	},
 ];
 
