@@ -115,7 +115,10 @@ function parseNivsResponse(
 		throw new NodeApiError(node.getNode(), errorResponse, {
 			httpCode: response.statusCode.toString(),
 			message: extractErrorMessage(response.body, response.statusCode),
-			description: extractErrorDescription(errorResponse),
+			// Fall back to the raw response body so an unexpected NIVS/Ivanti error shape (e.g. a
+			// rejected property on the target business object) is still visible instead of being
+			// swallowed behind the generic status-code message.
+			description: extractErrorDescription(errorResponse) ?? summarizeRawBody(response.body),
 		});
 	}
 
@@ -195,4 +198,34 @@ function findErrorDescription(value: unknown, depth: number): string | undefined
 	}
 
 	return undefined;
+}
+
+const rawBodyDescriptionMaxLength = 500;
+
+function summarizeRawBody(body: unknown): string | undefined {
+	if (body === undefined || body === null) {
+		return undefined;
+	}
+
+	let text: string;
+	if (typeof body === 'string') {
+		text = body.trim();
+	} else {
+		try {
+			text = JSON.stringify(body);
+		} catch {
+			return undefined;
+		}
+	}
+
+	if (text === '' || text === '{}' || text === '""') {
+		return undefined;
+	}
+
+	const truncated =
+		text.length > rawBodyDescriptionMaxLength
+			? `${text.slice(0, rawBodyDescriptionMaxLength)}…`
+			: text;
+
+	return `NKSC NIVS response body: ${truncated}`;
 }
