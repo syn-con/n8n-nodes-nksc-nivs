@@ -1,6 +1,6 @@
 {
   "name": "@synergyconsulting/n8n-nodes-nksc-nivs",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "n8n node for registering NKSC cyber incident reports in NKSC NIVS",
   "keywords": [
     "n8n-community-node-package"
