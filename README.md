@@ -1,29 +1,31 @@
 # NKSC NIVS n8n Node
 
-`n8n` community node for creating, updating, and searching NKSC security incident reports in NKSC NIVS.
+`n8n` community node for creating, updating, and searching NKSC security incident reports in NIVS (National Incident Management System).
 
 ## Overview
 
-The node exposes the NKSC report forms directly in the n8n editor and builds the NKSC NIVS request body from the selected form and entered values.
+The node exposes the NKSC report forms directly in the n8n editor and builds the NIVS request body from the selected form and entered values.
+
+Automated (API-based) incident registration in NIVS is not just a convenience — it is a legal requirement. Resolution No. 818 of the Government of the Republic of Lithuania, dated August 13, 2018, "On the Approval of the National Cybersecurity Incident Management Plan," requires cybersecurity subjects to register incidents in NIVS automatically via an API interface within 12 months of their registration in the Cybersecurity Subjects Registry (this deadline may be extended by up to another 12 months for objective reasons). This node exists to satisfy that automated-reporting obligation from within n8n.
 
 It handles:
 
 - report selection
 - field visibility and conditional requirements
-- payload shaping for the selected NKSC NIVS business object
+- payload shaping for the selected NIVS business object
 - search by external ticket ID
 
 ## Supported Operations
 
 | Operation | What it does | Input |
 | --- | --- | --- |
-| `Insert Report` | Creates a new report in NKSC NIVS | Select a report form and fill in the fields |
-| `Update Report` | Updates an existing NKSC NIVS record | `Record ID`, update mode, fields to update |
-| `Search Report` | Searches reports by external ticket ID | `External Ticket ID`, `Return All` or `Search Limit` |
+| `Insert NKSC Report` | Creates a new report in NIVS | Select a report form and fill in the fields |
+| `Update NKSC Report` | Updates an existing NIVS record | `Record ID`, update mode, fields to update |
+| `Search NKSC Report` | Searches reports by external ticket ID | `External Ticket ID`, optional `Search Limit` |
 
 ## Report Forms
 
-| Form | NKSC NIVS object | Notes |
+| Form | NIVS object | Notes |
 | --- | --- | --- |
 | Initial warning | `XSC_SecurityReport__InitialReports` | Initial warning records |
 | Major cyber incident | `XSC_SecurityReport__DetailReports` | `TypeOfCyberIncident` is fixed to `Didelis` |
@@ -37,7 +39,7 @@ It handles:
 3. The node loads the matching form definition.
 4. The editor shows the fields and controls for that form.
 5. The payload builder applies defaults, visibility rules, and conditional validation.
-6. The node sends the request to the correct NKSC NIVS endpoint.
+6. The node sends the request to the correct NIVS endpoint.
 7. The response is returned as n8n output items.
 
 Request methods:
@@ -60,7 +62,7 @@ Reporter identity fields are required on every form:
 - `ReporterPhone`
 - `ReporterTitle`
 
-The required-by-default fields in the node match the audited NKSC HTML forms. The reporter identity fields are additional required inputs enforced by NKSC NIVS.
+The required-by-default fields in the node match the audited NKSC HTML forms. The reporter identity fields are additional required inputs enforced by NIVS.
 
 ### Value types
 
@@ -75,7 +77,7 @@ Most fields can be driven by expressions using the same value shape shown in the
 Some selector fields accept extra expression formats to make generated workflows easier to maintain:
 
 - `Fields To Update` in `Selected Fields` update mode accepts field names, full numbered labels, one-based numbers, comma-separated numbers, or a numeric array. For example, `Summary`, `7`, `1,2,3`, and `[1,2,3]` are valid expression results.
-- `Threat` and `Threat Category` accept the NKSC NIVS value, the numbered English label, the unnumbered English label, or the option number. For example, `2`, `2. Malware`, and `Malware` all resolve to the same threat option.
+- `Threat` and `Threat Category` accept the NIVS value, the numbered English label, the unnumbered English label, or the option number. For example, `2`, `2. Malware`, and `Malware` all resolve to the same threat option.
 - Compact `Scope Options` and `Loss Options` selectors expect arrays of option field names, such as `["ScopeOption2"]`. For expression-heavy workflows, turn on the matching `Expand ... Options` toggle and drive the separate boolean fields instead.
 
 ### Conditional fields
@@ -84,13 +86,13 @@ Some fields remain visible in the editor even when their values are only require
 
 ### Update behavior
 
-`Update Report` defaults to `Selected Fields` mode. In this mode, the node only sends the fields selected in `Fields To Update`; the selector labels are numbered so expressions can pass values like `1,2,3` or `[1,2,3]`.
+`Update NKSC Report` defaults to `Selected Fields` mode. In this mode, the node only sends the fields selected in `Fields To Update`; the selector labels are numbered so expressions can pass values like `1,2,3` or `[1,2,3]`.
 
-`Full Form` mode sends the selected form payload and can optionally validate required fields before patching the NKSC NIVS record.
+`Full Form` mode sends the selected form payload and can optionally validate required fields before patching the NIVS record.
 
 ### Search behavior
 
-Search uses the selected report form to choose the NKSC NIVS business object, then filters by external ticket ID. By default it returns up to `Search Limit` records (defaulting to 10). Enable `Return All` to page through every matching record instead of stopping at the limit.
+Search uses the selected report form to choose the NIVS business object, then filters by external ticket ID and returns up to the configured limit, defaulting to 10 records.
 
 ## Credential Setup
 
@@ -98,7 +100,7 @@ Use the `NKSC NIVS API` credential.
 
 | Field | Purpose |
 | --- | --- |
-| `API Endpoint` | Full NKSC NIVS API endpoint URL. Defaults to `https://incidentai.nksc.lt/HEAT/api` |
+| `API Endpoint` | Full NIVS API base URL for your instance |
 | `API Key` | REST API key used for authentication |
 
 Behavior:
@@ -106,13 +108,7 @@ Behavior:
 - bare hostnames are normalized to HTTPS
 - explicit `http://...` URLs are preserved
 - trailing slashes are trimmed before the request URL is built
-- n8n tests the credential with `GET /odata/businessobject/XSC_SecurityReport__DetailReports`
-
-Examples:
-
-- `https://nivs.example.local/HEAT/api`
-- `https://nivs.example.local/api`
-- `http://nivs.local/HEAT/api`
+- n8n tests the credential with a read-only request against the configured endpoint
 
 ## Development
 
