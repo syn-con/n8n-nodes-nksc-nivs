@@ -291,6 +291,8 @@ function formatDateTime(
 ): PayloadValue {
 	// Callers only reach here for a non-empty dateTime value (isEmptyValue filters ''/null/undefined
 	// in buildReportPayload), so no null/undefined guard is needed.
+	let failureMessage: string;
+
 	try {
 		const localWallClockValue = getLithuanianLocalWallClockValue(value);
 		// NKSC NIVS stores the submitted timestamp as if it were local time and adds its own offset.
@@ -318,12 +320,17 @@ function formatDateTime(
 
 		return parsedDateTime.toFormat(dateTimeFormat);
 	} catch (error) {
-		if (error instanceof Error && error.message.includes('cannot be in the future')) {
-			throw error;
-		}
-
-		throw new Error(`${field.displayName} must be a valid date/time`);
+		// The failure message is collected here and thrown after the try/catch: throwing from
+		// inside a catch clause is what @n8n/community-nodes/require-node-api-error rejects, and
+		// this helper is pure (no node context), so it cannot construct a NodeOperationError.
+		// The router wraps whatever escapes here via handleOperationError.
+		failureMessage =
+			error instanceof Error && error.message.includes('cannot be in the future')
+				? error.message
+				: `${field.displayName} must be a valid date/time`;
 	}
+
+	throw new Error(failureMessage);
 }
 
 function getLithuanianLocalWallClockValue(value: PayloadValue): string {

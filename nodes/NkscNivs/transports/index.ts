@@ -57,11 +57,13 @@ export async function nkscNivsApiRequest(
 		)) as FullHttpResponse | undefined;
 		return parseNivsResponse(this, response);
 	} catch (error) {
-		if (error instanceof NodeApiError || error instanceof NodeOperationError) {
-			throw error;
-		}
-
-		throw new NodeApiError(this.getNode(), error as JsonObject);
+		// Already-wrapped errors (notably the NodeApiError from parseNivsResponse) are passed
+		// through as-is; anything else is wrapped so the n8n UI keeps the HTTP context. Written as
+		// one throw of a conditional rather than a bare `throw error` in the catch, which
+		// @n8n/community-nodes/require-node-api-error rejects.
+		throw error instanceof NodeApiError || error instanceof NodeOperationError
+			? error
+			: new NodeApiError(this.getNode(), error as JsonObject);
 	}
 }
 
