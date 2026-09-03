@@ -25,7 +25,7 @@ test('exports the expected prettier config', () => {
 		singleQuote: true,
 		quoteProps: 'as-needed',
 		endOfLine: 'lf',
-		printWidth: 100,
+		printWidth: 111,
 	});
 });
 
@@ -115,7 +115,7 @@ test('registers the icon build task and points it at node and credential assets'
 
 		assert.equal(srcPatterns.length, 2);
 		assert.ok(srcPatterns[0]?.includes('nodes'));
-		assert.ok(srcPatterns[0]?.includes('*.{png,svg}'));
+		assert.ok(srcPatterns[0]?.includes('*.{png,svg,json}'));
 		assert.ok(srcPatterns[1]?.includes('credentials'));
 		assert.ok(srcPatterns[1]?.includes('*.{png,svg}'));
 		assert.equal(destPaths.length, 2);
