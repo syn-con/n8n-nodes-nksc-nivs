@@ -8,5 +8,5 @@ module.exports = {
 	singleQuote: true,
 	quoteProps: 'as-needed',
 	endOfLine: 'lf',
-	printWidth: 100,
+	printWidth: 111,
 };
