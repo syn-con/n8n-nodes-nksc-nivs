@@ -1,6 +1,6 @@
 {
-  "name": "@syn-con/n8n-nodes-nksc-nivs",
-  "version": "0.1.9",
+  "name": "@@synergyconsulting/n8n-nodes-nksc-nivs",
+  "version": "1.0.0",
   "description": "n8n node for registering NKSC cyber incident reports in NKSC NIVS",
   "keywords": [
     "n8n-community-node-package",
@@ -8,8 +8,8 @@
     "nivs"
   ],
   "author": {
-    "name": "UAB Synergy",
-    "email": "info@synergy.lt"
+    "name": "SYNERGY",
+    "email": "support@synergy.lt"
   },
   "license": "MIT",
   "homepage": "https://github.com/syn-con/n8n-nodes-nksc-nivs#readme",
@@ -36,6 +36,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "release": "n8n-node release",
     "prepublishOnly": "npm run build"
   },
   "files": [
