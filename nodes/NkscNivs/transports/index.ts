@@ -108,14 +108,14 @@ function parseNivsResponse(
 	if (response && response.statusCode > 299) {
 		const errorResponse = getErrorResponseBody(response.body);
 		// n8n's NodeApiError reads errorResponse.message directly and calls .toUpperCase() on it while
-		// building the descriptive message. NIVS/Ivanti OData errors carry a non-string `message` (the
+		// building the descriptive message. NIVS OData errors carry a non-string `message` (the
 		// localised { lang, value } object), so leaving message extraction to NodeApiError throws
 		// "(message || "").toUpperCase is not a function". Passing an always-string message (and the real
 		// HTTP status code) keeps this.message a string and prevents that crash.
 		throw new NodeApiError(node.getNode(), errorResponse, {
 			httpCode: response.statusCode.toString(),
 			message: extractErrorMessage(response.body, response.statusCode),
-			// Fall back to the raw response body so an unexpected NIVS/Ivanti error shape (e.g. a
+			// Fall back to the raw response body so an unexpected NIVS error shape (e.g. a
 			// rejected property on the target business object) is still visible instead of being
 			// swallowed behind the generic status-code message.
 			description: extractErrorDescription(errorResponse) ?? summarizeRawBody(response.body),
@@ -134,7 +134,7 @@ function getErrorResponseBody(body: unknown): JsonObject {
 		: {};
 }
 
-// Keys under which NIVS/Ivanti, OData and ASP.NET Web API responses put the human-readable
+// Keys under which NIVS, OData and ASP.NET Web API responses put the human-readable
 // error string. `value` covers OData's localised message object ({ lang, value }); `error`
 // is traversed to reach the nested OData error object.
 const ERROR_MESSAGE_KEYS = ['message', 'Message', 'value', 'ExceptionMessage', 'error'] as const;

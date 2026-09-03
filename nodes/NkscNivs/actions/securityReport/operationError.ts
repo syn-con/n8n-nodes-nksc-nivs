@@ -11,7 +11,7 @@ export function getErrorMessage(error: unknown): string {
 }
 
 // In continue-on-fail mode the item output is the only place the failure is reported, so carry the
-// description (which now includes the raw NIVS/Ivanti response body when no structured message is
+// description (which now includes the raw NIVS response body when no structured message is
 // found) and HTTP status code alongside the message instead of dropping them.
 function buildErrorJson(error: unknown): IDataObject {
 	const json: IDataObject = { error: getErrorMessage(error) };

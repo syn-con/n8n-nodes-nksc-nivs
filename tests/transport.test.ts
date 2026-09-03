@@ -165,7 +165,7 @@ test('rejects non-2xx responses with API error content', async () => {
 });
 
 test('reports a clean message when the error body carries a non-string message object', async () => {
-	// Reproduces the NIVS/Ivanti OData error shape that previously crashed inside n8n's NodeApiError
+	// Reproduces the NIVS OData error shape that previously crashed inside n8n's NodeApiError
 	// with "(message || \"\").toUpperCase is not a function": a localised { lang, value } message
 	// object plus a non-numeric code that stops NodeApiError from normalising it away.
 	const context = createTransportContext({
