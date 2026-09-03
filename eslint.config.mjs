@@ -1,6 +1,5 @@
 import { config as n8nConfig } from '@n8n/node-cli/eslint';
 
-/** @type {import('eslint').Linter.Config[]} */
 export default [
 	...n8nConfig,
 	{
