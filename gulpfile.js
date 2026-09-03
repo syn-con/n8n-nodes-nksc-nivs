@@ -2,7 +2,8 @@ const path = require('path');
 const { task, src, dest } = require('gulp');
 task('build:icons', copyIcons);
 function copyIcons() {
-	const nodeSource = path.resolve('nodes', '**', '*.{png,svg}');
+	// Icons plus the node codex (*.node.json) — n8n reads both from dist at load time.
+	const nodeSource = path.resolve('nodes', '**', '*.{png,svg,json}');
 	const nodeDestination = path.resolve('dist', 'nodes');
 
 	src(nodeSource).pipe(dest(nodeDestination));

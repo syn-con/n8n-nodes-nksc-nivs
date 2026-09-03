@@ -1,0 +1,19 @@
+{
+	"node": "@synergyconsulting/n8n-nodes-nksc-nivs.nkscNivs",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Utility"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/syn-con/n8n-nodes-nksc-nivs#credential-setup"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/syn-con/n8n-nodes-nksc-nivs#readme"
+			}
+		]
+	},
+	"alias": ["NKSC", "NIVS", "Incident", "Security", "Report", "Cybersecurity"]
+}
